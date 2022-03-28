@@ -1,0 +1,12 @@
+{
+    "files.associations": {
+        "fftw3.h": "c",
+        "defs.h": "c",
+        "lib_defs.h": "c",
+        "math.h": "c",
+        "stdio.h": "c",
+        "load_module_shlib.h": "c",
+        "errno.h": "c",
+        "stdint.h": "c"
+    }
+}
