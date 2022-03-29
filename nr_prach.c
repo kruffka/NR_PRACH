@@ -346,8 +346,8 @@ void write_matlab(char *filename, char *arrayname, int32_t *array, uint32_t len,
     exit_fun("cant open file");
   }
 
-  if(start + len >= MAX_LEN) {
-    exit_fun(">= max_len");
+  if(start + len > MAX_LEN) {
+    exit_fun("> max_len");
   }
 
   fprintf(file, "%s = [", arrayname);
@@ -707,10 +707,7 @@ if(mu == 0){
   }
 
 
-  LOG_M("prachF.m", "txdataF", prachF, dftlen, 0);
-
-
-#if 0 // idft
+#if 1 // idft
 if (mu == 0) {
     switch (samples_per_subframe) {
 
@@ -745,13 +742,13 @@ if (mu == 0) {
 
 
     
-  #ifdef NR_PRACH_DEBUG
+  // #ifdef NR_PRACH_DEBUG
     printf("PRACH [UE %d] N_RB_UL %d prach_start %d, prach_len %d prach_fmt_id %d\n", Mod_id,
       106,
       prach_start,
       prach_len,
       prach_fmt_id);
-  #endif
+  // #endif
 
   for (i=0; i<prach_len; i++) { // prach_len
     ((int16_t*)(&txdata[prach_start]))[2*i] = prach[2*i];
@@ -777,9 +774,7 @@ if (mu == 0) {
 int detect_nr_prach(int16_t *txdataF, uint16_t *max_preamble, uint16_t *max_preamble_energy, uint16_t *max_preamble_delay);
 
 
-void main() {
-
-  
+void main() { 
 
     // load_dftslib();
     int subframe_len = 30720;
@@ -792,10 +787,33 @@ void main() {
     if(txdataF == NULL) {
       exit_fun("txdataF");
     }
-  uint16_t max_preamble[4]={0},max_preamble_energy[4]={0},max_preamble_delay[4]={0};
+    uint16_t max_preamble[4]={0},max_preamble_energy[4]={0},max_preamble_delay[4]={0};
     printf(">>>>>>>>>>>>>>> PRACH GENERATION <<<<<<<<<<<<<<\n");
-    int preamble_index = 5;
+    int preamble_index = 6;
     generate_nr_prach(txdata, txdataF, 0, 1, preamble_index);
+
+    // Air interface
+
+    // memset(txdataF, 0, subframe_len*sizeof(int32_t));
+    // memset(txdata, 0, frame_len*sizeof(int32_t));
+
+    // LOG_M("txdataF_b.m", "txF", txdataF, subframe_len, 0);
+    // time domain
+    idft_30720(txdataF, &txdata[0]);
+    // LOG_M("txdata.m", "tx", txdata, frame_len, 0);
+    
+    // set txdataF buffer to 0 before new dft
+    memset(txdataF, 0, subframe_len*sizeof(int32_t));
+
+    //back to frequency domain
+    dft_30720(txdataF, &txdata[0]); // extract txdataF from txdata[prach_start]
+
+    // idft_30720(txdataF, &txdata[30720]); //
+    LOG_M("txdataF.m", "txF", txdataF, subframe_len, 0);
+    
+
+    
+
 
     printf(">>>>>>>>>>>>>>> PRACH DETECTION <<<<<<<<<<<<<<\n");
 
@@ -819,7 +837,6 @@ void main() {
     } else {
       printf("<<<<<<<<<<<<<<<<<<<<<<< Incorrect!\n");
     }
-    // LOG_M("txdata.m", "ts", txdata, subframe_len, start);
 
 
     free(txdataF);
