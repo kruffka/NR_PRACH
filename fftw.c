@@ -52,8 +52,6 @@ int idft(int16_t *txdataF, int16_t *txdata) {
 
     fftw_destroy_plan(plan);
 
-    printf("idft done\n");
-
     return 0;
 }
 
@@ -80,8 +78,6 @@ int idft_30720(int16_t *txdataF, int16_t *txdata) {
 
     fftw_destroy_plan(plan);
 
-    printf("30720 idft done\n");
-
     return 0;
 }
 
@@ -103,7 +99,6 @@ int idft_1024(int16_t *txdataF, int16_t *txdata) {
 
     fftw_destroy_plan(plan);
 
-    printf("idft done\n");
 
     return 0;
 }
@@ -124,8 +119,6 @@ int dft_30720(int16_t *txdataF, int16_t *txdata) {
     double_to_int(result, txdataF, num_ps); // from result to txdataF  
 
     fftw_destroy_plan(plan);
-
-    printf("dft done\n");
 
     return 0;
 }
