@@ -796,11 +796,12 @@ void main() {
     
     int preamble_index = 6;
     int prach_start = 30720; // in time domain (0 < prach_start+24576 < frame_len)
-    int max_shift = 100;
+    int max_shift = 30000;
     
     for (int shift = prach_start; shift < prach_start+max_shift; shift++) {
 
-      printf("Current prach_start = %d shift = %d\n", shift, shift - prach_start);
+      if (shift % 1000 == 0)
+        printf("Current prach_start = %d shift = %d [%d:%d]\n", shift, shift - prach_start, correct, incorrect);
     
       memset(txdataF, 0, subframe_len*sizeof(int32_t));
 
@@ -816,7 +817,7 @@ void main() {
       // time domain from nrUE
 
       idft_30720(txdataF, (int16_t *)&txdata[shift]); // 
-      LOG_M("txdata.m", "tx", txdata, frame_len, 0);
+      // LOG_M("txdata.m", "tx", txdata, frame_len, 0);
 
       //
       //    Air interface
@@ -846,16 +847,16 @@ void main() {
             max_preamble_energy[0]%10,
             max_preamble_delay[0],
             0);
+      
+    
+        printf(">>>>>>>>>>>>>>> PRACH PREAMBLE DETECTED %d %d %d %d <<<<<<<<<<<<<<\n", max_preamble[0], max_preamble[1], max_preamble[2], max_preamble[3]);
       #endif
 
-      printf(">>>>>>>>>>>>>>> PRACH PREAMBLE DETECTED %d %d %d %d <<<<<<<<<<<<<<\n", max_preamble[0], max_preamble[1], max_preamble[2], max_preamble[3]);
-
-
       if (max_preamble[0] == preamble_index) {
-        printf(">>>>>>>>>>>>>>>>>>>>>>>>> CORRECT!\n");
+        // printf(">>>>>>>>>>>>>>>>>>>>>>>>> CORRECT!\n");
         correct++;
       } else {
-        printf("<<<<<<<<<<<<<<<<<<<<<<< Incorrect!\n");
+        // printf("<<<<<<<<<<<<<<<<<<<<<<< Incorrect!\n");
         incorrect++;
       }
     
