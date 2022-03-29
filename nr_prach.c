@@ -796,25 +796,26 @@ void main() {
     
     int preamble_index = 6;
     int prach_start = 30720; // in time domain (0 < prach_start+24576 < frame_len)
-    int max_shift = 1;
+    int max_shift = 100;
     
-    for (int prach_shift = prach_start; prach_shift < prach_start+max_shift; prach_shift++) {
+    for (int shift = prach_start; shift < prach_start+max_shift; shift++) {
 
-      printf("Current prach_start = %d\n", prach_shift);
+      printf("Current prach_start = %d shift = %d\n", shift, shift - prach_start);
     
+      memset(txdataF, 0, subframe_len*sizeof(int32_t));
 
       // >>>>>>>>>>>>>>> PRACH GENERATION <<<<<<<<<<<<<<
-      generate_nr_prach(txdata, txdataF, 0, 1, preamble_index, 0); // idft is done here
+      generate_nr_prach(txdata, txdataF, 0, 1, preamble_index, 0); // idft is done bellow
 
 
 
       // memset(txdataF, 0, subframe_len*sizeof(int32_t));
-      // memset(txdata, 0, frame_len*sizeof(int32_t));
+      memset(txdata, 0, frame_len*sizeof(int32_t));
 
       // LOG_M("txdataF_b.m", "txF", txdataF, subframe_len, 0);
       // time domain from nrUE
 
-      idft_30720(txdataF, (int16_t *)&txdata[prach_shift]); // 
+      idft_30720(txdataF, (int16_t *)&txdata[shift]); // 
       LOG_M("txdata.m", "tx", txdata, frame_len, 0);
 
       //
