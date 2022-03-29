@@ -788,6 +788,7 @@ void main() {
 
     int32_t txdata[307200] = {0};
     int16_t *txdataF = (int16_t *)malloc(sizeof(int32_t)*subframe_len);
+    int16_t *txdataF_gNB = (int16_t *)malloc(sizeof(int32_t)*subframe_len);
     if(txdataF == NULL) {
       exit_fun("txdataF");
     }
@@ -796,9 +797,10 @@ void main() {
     
     int preamble_index = 6;
     int prach_start = 30720; // in time domain (0 < prach_start+24576 < frame_len)
-    int max_shift = 30000;
+    int max_shift = 1; //30720;
     
     for (int shift = prach_start; shift < prach_start+max_shift; shift++) {
+    // for (int shift = prach_start; shift > prach_start-max_shift; shift--) {
 
       if (shift % 1000 == 0)
         printf("Current prach_start = %d shift = %d [%d:%d]\n", shift, shift - prach_start, correct, incorrect);
@@ -823,20 +825,19 @@ void main() {
       //    Air interface
       //
 
-      // set txdataF buffer to 0 before new dft
-      memset(txdataF, 0, subframe_len*sizeof(int32_t));
+      // clear txdataF buffer before new dft
+      memset(txdataF_gNB, 0, subframe_len*sizeof(int32_t));
 
       // frequency domain at gNB
-      dft_30720(txdataF, (int16_t *)&txdata[prach_start]); // extract txdataF from txdata[30720] - first slot (should be from prach_start)
-
-      // LOG_M("txdataF.m", "txF", txdataF, subframe_len, 0);
+      dft_30720(txdataF_gNB, (int16_t *)&txdata[prach_start]); // extract txdataF from txdata[30720] - first slot (should be from prach_start)
+      // LOG_M("txdataF_gNB.m", "txF", txdataF_gNB, subframe_len, 0);
       
 
       
 
       // >>>>>>>>>>>>>>> PRACH DETECTION <<<<<<<<<<<<<<
-      detect_nr_prach(&txdataF[16952*2], max_preamble, max_preamble_energy, max_preamble_delay);
-      #if 0
+      detect_nr_prach(&txdataF_gNB[16952*2], max_preamble, max_preamble_energy, max_preamble_delay);
+      #if 1
         printf("[RAPROC] Frame %d, slot %d, occasion %d (prachStartSymbol %d) : Most likely preamble %d, energy %d.%d dB delay %d (prach_energy counter %d)\n",
             0,
             0,
@@ -864,7 +865,7 @@ void main() {
 
     printf(">>>>>>>>>>>>>>> Total: %d samples shift - detected = %d, incorrect = %d\n", max_shift, correct, incorrect);
 
-
+    free(txdataF_gNB);
     free(txdataF);
 
 }
