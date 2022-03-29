@@ -797,16 +797,16 @@ void main() {
     // memset(txdataF, 0, subframe_len*sizeof(int32_t));
     // memset(txdata, 0, frame_len*sizeof(int32_t));
 
-    // LOG_M("txdataF_b.m", "txF", txdataF, subframe_len, 0);
+    LOG_M("txdataF_b.m", "txF", txdataF, subframe_len, 0);
     // time domain
-    idft_30720(txdataF, &txdata[0]);
-    // LOG_M("txdata.m", "tx", txdata, frame_len, 0);
+    idft_30720(txdataF, &txdata[30720]);
+    LOG_M("txdata.m", "tx", txdata, frame_len, 0);
     
     // set txdataF buffer to 0 before new dft
     memset(txdataF, 0, subframe_len*sizeof(int32_t));
 
     //back to frequency domain
-    dft_30720(txdataF, &txdata[0]); // extract txdataF from txdata[prach_start]
+    dft_30720(txdataF, &txdata[30720]); // extract txdataF from txdata[prach_start]
 
     // idft_30720(txdataF, &txdata[30720]); //
     LOG_M("txdataF.m", "txF", txdataF, subframe_len, 0);
