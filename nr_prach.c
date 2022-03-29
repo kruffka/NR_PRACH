@@ -789,16 +789,17 @@ void main() {
     int32_t txdata[307200] = {0};
     int16_t *txdataF = (int16_t *)malloc(sizeof(int32_t)*subframe_len);
     int16_t *txdataF_gNB = (int16_t *)malloc(sizeof(int32_t)*subframe_len);
-    if(txdataF == NULL) {
-      exit_fun("txdataF");
+    if(txdataF == NULL || txdataF_gNB == NULL) {
+      exit_fun("Can't malloc");
     }
     uint16_t max_preamble[4]={0},max_preamble_energy[4]={0},max_preamble_delay[4]={0};
     
-    
+
     int preamble_index = 6;
-    int prach_start = 30720; // in time domain (0 < prach_start+24576 < frame_len)
-    int max_shift = 1; //30720;
+    const int prach_start = 30720; // in time domain (0 < prach_start+24576 < frame_len)
+    int max_shift = 1000; //30720;
     
+
     for (int shift = prach_start; shift < prach_start+max_shift; shift++) {
     // for (int shift = prach_start; shift > prach_start-max_shift; shift--) {
 
@@ -811,6 +812,11 @@ void main() {
       generate_nr_prach(txdata, txdataF, 0, 1, preamble_index, 0); // idft is done bellow
 
 
+      #if 0
+        // frequency shift 
+        //txdataF[] = 
+
+      #endif
 
       // memset(txdataF, 0, subframe_len*sizeof(int32_t));
       memset(txdata, 0, frame_len*sizeof(int32_t));
@@ -821,9 +827,11 @@ void main() {
       idft_30720(txdataF, (int16_t *)&txdata[shift]); // 
       // LOG_M("txdata.m", "tx", txdata, frame_len, 0);
 
+
       //
       //    Air interface
       //
+
 
       // clear txdataF buffer before new dft
       memset(txdataF_gNB, 0, subframe_len*sizeof(int32_t));
@@ -837,7 +845,7 @@ void main() {
 
       // >>>>>>>>>>>>>>> PRACH DETECTION <<<<<<<<<<<<<<
       detect_nr_prach(&txdataF_gNB[16952*2], max_preamble, max_preamble_energy, max_preamble_delay);
-      #if 1
+      #if 0
         printf("[RAPROC] Frame %d, slot %d, occasion %d (prachStartSymbol %d) : Most likely preamble %d, energy %d.%d dB delay %d (prach_energy counter %d)\n",
             0,
             0,
