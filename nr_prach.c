@@ -576,7 +576,7 @@ int32_t generate_nr_prach(int32_t *txdata, int16_t *txdataF, uint8_t gNB_id, uin
   }
 
 
-  prach_start = 30720 + sample_offset_slot;
+  // prach_start = 30720 + sample_offset_slot;
 
   // printf("prachstartsymbold %d, sample_offset_slot %d, prach_start %d\n",prachStartSymbol, sample_offset_slot, prach_start);
 
@@ -685,6 +685,12 @@ if(mu == 0){
         first_nonzero_root_idx);
   #endif
 
+  //
+  // Freq shift
+  //
+  k += prach_start;
+  if (k >= dftlen) k = 0;
+
 
   for (offset=0,offset2=0; offset<N_ZC; offset++,offset2+=preamble_shift) {
 
@@ -777,11 +783,12 @@ if (mu == 0) {
 
 
 int detect_nr_prach(int16_t *txdataF, uint16_t *max_preamble, uint16_t *max_preamble_energy, uint16_t *max_preamble_delay);
-
+#include <time.h>
 
 void main() { 
+  
+    srand(time(NULL));
 
-    // load_dftslib();
     int subframe_len = 30720;
     int frame_len = subframe_len*10;
     int correct = 0, incorrect = 0;
@@ -797,18 +804,23 @@ void main() {
 
     int preamble_index = 6;
     const int prach_start = 30720; // in time domain (0 < prach_start+24576 < frame_len)
-    int max_shift = 1000; //30720;
+    int max_shift = 30720; //30720;
     
 
-    for (int shift = prach_start; shift < prach_start+max_shift; shift++) {
-    // for (int shift = prach_start; shift > prach_start-max_shift; shift--) {
+    // for (int shift = prach_start; shift < prach_start+max_shift; shift++) {
+    for (int shift = prach_start; shift > prach_start-max_shift; shift--) {
+          preamble_index = rand()%63;
+          // printf(">>>>>>>>>>>>>>> PRACH preamble_index %d<<<<<<<<<<<<<<\n", preamble_index);
 
-      if (shift % 1000 == 0)
-        printf("Current prach_start = %d shift = %d [%d:%d]\n", shift, shift - prach_start, correct, incorrect);
-    
+
+      if (shift % 1000 == 0) {
+        printf("Current prach_start = %d shift = %d [%d:%d] detection prob %lf\n", shift, shift - prach_start, correct, incorrect, (double)correct/(correct+incorrect));
+        // correct = 0;
+        // incorrect = 0;
+      }
       memset(txdataF, 0, subframe_len*sizeof(int32_t));
 
-      // >>>>>>>>>>>>>>> PRACH GENERATION <<<<<<<<<<<<<<
+      // >>>>>>>>>>>>>>> PRACH GENERATION <<<<<<<<<<<<<< shift-prach_start add to last parameter of generate_nr_prach to do freq shift
       generate_nr_prach(txdata, txdataF, 0, 1, preamble_index, 0); // idft is done bellow
 
 
@@ -821,7 +833,7 @@ void main() {
       // memset(txdataF, 0, subframe_len*sizeof(int32_t));
       memset(txdata, 0, frame_len*sizeof(int32_t));
 
-      // LOG_M("txdataF_b.m", "txF", txdataF, subframe_len, 0);
+      // LOG_M("txdataF.m", "txF", txdataF, subframe_len, 0);
       // time domain from nrUE
 
       idft_30720(txdataF, (int16_t *)&txdata[shift]); // 
@@ -832,13 +844,20 @@ void main() {
       //    Air interface
       //
 
+      for(int i = 0; i < frame_len; i++) {
+        ((int16_t *)&txdata[0])[2*i] += rand()%20-10;
+        ((int16_t *)&txdata[0])[2*i + 1] += rand()%20-10;
+      }
+
+      
+      // LOG_M("txdata_gNB.m", "tx_gNB", txdata, frame_len, 0);
 
       // clear txdataF buffer before new dft
       memset(txdataF_gNB, 0, subframe_len*sizeof(int32_t));
 
       // frequency domain at gNB
       dft_30720(txdataF_gNB, (int16_t *)&txdata[prach_start]); // extract txdataF from txdata[30720] - first slot (should be from prach_start)
-      // LOG_M("txdataF_gNB.m", "txF", txdataF_gNB, subframe_len, 0);
+      // LOG_M("txdataF_gNB.m", "txF_gNB", txdataF_gNB, subframe_len, 0);
       
 
       
@@ -1033,7 +1052,7 @@ int i;
       // }
    
       for (aa=0;aa<nb_rx; aa++) {
-	// Do componentwise product with Xu* on each antenna 
+	  // Do componentwise product with Xu* on each antenna 
 
 	       for (offset=0; offset<(N_ZC<<1); offset+=2) {
 	          prachF[offset]   = (int16_t)(((int32_t)Xu[offset]*rxsigF[offset]   + (int32_t)Xu[offset+1]*rxsigF[offset+1])>>15);
