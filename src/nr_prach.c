@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include "nr_prach.h"
 
+int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, int frame, uint8_t slot);
+
 int main(int argc, char *argv[]) {
 
     // if (argc < 2) {
@@ -29,7 +31,7 @@ int main(int argc, char *argv[]) {
     //
     // ========================== Generate preamble ==========================
     //
-    // generate_nr_prach();
+    generate_nr_prach(&ue, 0, 0);
 
 
     //

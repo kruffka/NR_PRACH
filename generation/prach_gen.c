@@ -31,7 +31,7 @@ int min(int a, int b) {
 // - idft for short sequence assumes we are transmitting starting in symbol 0 of a PRACH slot
 // - Assumes that PRACH SCS is same as PUSCH SCS @ 30 kHz, take values for formats 0-2 and adjust for others below
 // - Preamble index different from 0 is not detected by gNB
-int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, uint8_t gNB_id, int frame, uint8_t slot) {
+int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, int frame, uint8_t slot) {
 
   NR_FRAME_PARMS *fp = &ue->frame_parms;
   fapi_nr_config_request_t *nrUE_config = &ue->nrUE_config;

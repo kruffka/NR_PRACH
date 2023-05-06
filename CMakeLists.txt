@@ -1,3 +1,6 @@
+set(FLAGS "-g3 -O0")
+
+
 cmake_minimum_required(VERSION 3.10)
 
 project(nr_prach)
@@ -14,5 +17,7 @@ add_executable(nr_prach ${SRC}/nr_prach.c
                         ${PRACH_UE_SRC}/prach_gen.c
                         ${PRACH_gNB_SRC}/prach_detect.c
                         )
+
+set_target_properties(nr_prach PROPERTIES COMPILE_FLAGS ${FLAGS})
 
 # target_link_libraries(fftw3)
