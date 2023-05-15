@@ -11,7 +11,9 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include/")
 set(SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/")
 set(PRACH_UE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/generation/")
 set(PRACH_gNB_SRC "${CMAKE_CURRENT_SOURCE_DIR}/detection/")
+set(COMMON_DIR "${CMAKE_CURRENT_SOURCE_DIR}/common")
 
+add_library(oai_dfts ${COMMON_DIR}/oai_dfts_int.c)
 
 add_executable(nr_prach ${SRC}/nr_prach.c
                         ${PRACH_UE_SRC}/prach_gen.c

@@ -7,7 +7,11 @@
 #include <stdbool.h>
 
 // COMMON TYPES
-typedef struct NR_FRAME_PARMS {
+typedef struct NR_FRAME_PARMS NR_FRAME_PARMS;
+
+typedef uint32_t (*get_samples_per_slot_t)(int slot, NR_FRAME_PARMS* fp);
+typedef uint32_t (*get_samples_slot_timestamp_t)(int slot, NR_FRAME_PARMS* fp, uint8_t sl_ahead);
+struct NR_FRAME_PARMS {
   /// Number of resource blocks (RB) in DL
   int N_RB_DL;
   /// Number of resource blocks (RB) in UL
@@ -54,7 +58,11 @@ typedef struct NR_FRAME_PARMS {
   uint8_t nb_antennas_rx;
   /// Number of common transmit antenna ports in eNodeB (1 or 2)
   uint8_t nb_antenna_ports_gNB;
-} NR_FRAME_PARMS;
+  /// Number of samples in current slot
+  get_samples_per_slot_t get_samples_per_slot;
+  /// Number of samples before slot
+  get_samples_slot_timestamp_t get_samples_slot_timestamp;
+};
 
 // NR UE TYPES
 

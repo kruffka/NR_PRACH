@@ -3,6 +3,9 @@
 
 #include "nr_prach.h"
 
+#define NR_PRACH_DEBUG
+#define AssertFatal(COND, ...) do { if (!COND) {printf(__VA_ARGS__); abort(); }} while(0)
+
 int32_t nr_ru[839];
 int32_t nr_du[839];
 uint16_t *prach_root_sequence_map_0_3;
@@ -23,6 +26,9 @@ int max(int a, int b) {
 int min(int a, int b) {
     return a < b;
 }
+
+const char *prachfmt[]={"0","1","2","3", "A1","A2","A3","B1","B4","C0","C2","A1/B1","A2/B2","A3/B3"};
+
 
 // Note:
 // - prach_fmt_id is an ID used to map to the corresponding PRACH format value in prachfmt
@@ -53,23 +59,23 @@ int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, int frame, uint8_t slot) {
   dftlen                  = 0;
   first_nonzero_root_idx  = 0;
   prach                   = prach_tmp;
-  amp                     = ue->prach_vars.amp;
   prachF                  = prachF_tmp;
+  amp                     = ue->prach_vars.amp;
   prach_sequence_length   = nrUE_config->prach_config.prach_sequence_length;
-  N_ZC                    = (prach_sequence_length == 0) ? 839:139;
   mu                      = nrUE_config->prach_config.prach_sub_c_spacing;
+  n_ra_prb                = nrUE_config->prach_config.num_prach_fd_occasions_list[fd_occasion].k1,//prach_pdu->freq_msg1;
   restricted_set          = prach_pdu->restricted_set;
   rootSequenceIndex       = prach_pdu->root_seq_id;
-  n_ra_prb                = nrUE_config->prach_config.num_prach_fd_occasions_list[fd_occasion].k1,//prach_pdu->freq_msg1;
   NCS                     = prach_pdu->num_cs;
   prach_fmt_id            = prach_pdu->prach_format;
   preamble_index          = prach_pdu->ra_PreambleIndex;
+  prachStartSymbol        = prach_pdu->prach_start_symbol;
   kbar                    = 1;
   K                       = 24;
   k                       = 12*n_ra_prb - 6*fp->N_RB_UL;
-  prachStartSymbol        = prach_pdu->prach_start_symbol;
+  N_ZC                    = (prach_sequence_length == 0) ? 839:139;
 
-  LOG_D(PHY,"Generate NR PRACH %d.%d\n", frame, slot);
+  LOG_D(PHY, "Generate NR PRACH %d.%d\n", frame, slot);
 
   compute_nr_prach_seq(nrUE_config->prach_config.prach_sequence_length,
                        nrUE_config->prach_config.num_prach_fd_occasions_list[fd_occasion].num_root_sequences,
@@ -90,10 +96,10 @@ int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, int frame, uint8_t slot) {
       sample_offset_slot = (fp->ofdm_symbol_size + fp->nb_prefix_samples) * prachStartSymbol;
   }
 
-//   prach_start = fp->get_samples_slot_timestamp(slot, fp, 0) + sample_offset_slot;
+  prach_start = fp->get_samples_slot_timestamp(slot, fp, 0) + sample_offset_slot;
 
   printf("prachstartsymbold %d, sample_offset_slot %d, prach_start %d\n",prachStartSymbol, sample_offset_slot, prach_start);
-abort();
+
   // First compute physical root sequence
   /************************************************************************
   * 4G and NR NCS tables are slightly different and depend on prach format
@@ -242,8 +248,7 @@ abort();
       break;
 
     default:
-    abort();
-    //   AssertFatal(1==0, "Illegal PRACH format %d for sequence length 839\n", prach_fmt_id);
+      AssertFatal(1==0, "Illegal PRACH format %d for sequence length 839\n", prach_fmt_id);
       break;
     }
   } else {
@@ -287,8 +292,7 @@ abort();
       break;
 
     default:
-    abort();
-    //   AssertFatal(1==0,"Unknown PRACH format ID %d\n", prach_fmt_id);
+      AssertFatal(1==0, "Unknown PRACH format ID %d\n", prach_fmt_id);
       break;
     }
     dftlen = 2048 >> mu;
@@ -346,8 +350,7 @@ abort();
     break;
 
   default:
-  abort();
-    // AssertFatal(1==0,"sample rate %f MHz not supported for numerology %d\n", fp->samples_per_subframe / 1000.0, mu);
+    AssertFatal(1==0, "sample rate %f MHz not supported for numerology %d\n", fp->samples_per_subframe / 1000.0, mu);
   }
 
   #ifdef NR_PRACH_DEBUG
@@ -395,7 +398,7 @@ abort();
   // This is after cyclic prefix
   prach2 = prach+(2*Ncp); // times 2 for complex samples
 //   const idft_size_idx_t idft_size = get_idft(dftlen);
-printf("abotr\n");
+printf("abort idft\n");
 abort();
 //   idft(idft_size, prachF, prach, 1);
   memmove(prach2, prach, (dftlen<<2));

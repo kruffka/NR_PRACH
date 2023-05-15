@@ -667,7 +667,7 @@ if(mu == 0){
       break;
 
     default:
-    //   AssertFatal(1==0,"sample rate %f MHz not supported for numerology %d\n", 30720 / 1000.0, mu);
+      AssertFatal(1==0,"sample rate %f MHz not supported for numerology %d\n", 30720 / 1000.0, mu);
         printf("sample rate %f MHz not supported for numerology %d\n", 30720 / 1000.0, mu);
     }
   }
