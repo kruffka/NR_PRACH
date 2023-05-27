@@ -22,6 +22,7 @@
 #ifndef __PHY_TOOLS_DEFS__H__
 #define __PHY_TOOLS_DEFS__H__
 
+#define OAIDFTS_MAIN
 /** @addtogroup _PHY_DSP_TOOLS_
 
 
@@ -32,7 +33,18 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <assert.h>
+#include <malloc.h>
 #include "sse_intrin.h"
+
+
+static inline void *malloc16_clear( size_t size ) {
+  void *ptr = memalign(32, size+32);
+  assert(ptr);
+  memset( ptr, 0, size );
+  return ptr;
+}
+
+#define AssertFatal(COND, ...) do { if (!COND) {printf("\n" __VA_ARGS__); abort(); }} while(0)
 
 #if defined(__x86_64__) || defined(__i386__)
 #define simd_q15_t __m128i
@@ -104,7 +116,7 @@ extern "C" {
   static inline fourDimArray_t *allocateFourDimArray(int elmtSz, int dim1, int dim2, int dim3, int dim4)
   {
     int sz = elmtSz;
-    DevAssert(dim1 > 0);
+    AssertFatal(dim1 > 0, "dim1 %d > 0\n", dim1);
     sz *= dim1;
     if (dim2) {
       sz *= dim2;
@@ -130,7 +142,7 @@ extern "C" {
       free(ArraY);                                                                                                         \
       ArraY = allocateFourDimArray(sizeof(elementType), diM1, diM2, diM3, diM4);                                           \
     } else                                                                                                                 \
-      DevAssert((diM1) == (ArraY)->dim1 && (diM2) == (ArraY)->dim2 && (diM3) == (ArraY)->dim3 && (diM4) == (ArraY)->dim4); \
+      AssertFatal((diM1) == (ArraY)->dim1 && (diM2) == (ArraY)->dim2 && (diM3) == (ArraY)->dim3 && (diM4) == (ArraY)->dim4); \
   }
 
 #define cast1Darray(workingVar, elementType, ArraY) elementType *workingVar = (elementType *)((ArraY)->data);

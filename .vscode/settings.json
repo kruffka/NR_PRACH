@@ -8,6 +8,11 @@
         "load_module_shlib.h": "c",
         "errno.h": "c",
         "stdint.h": "c",
-        "sse_intrin.h": "c"
+        "sse_intrin.h": "c",
+        "stdarg.h": "c",
+        "nr_prach.h": "c",
+        "sse3.h": "c",
+        "random": "c",
+        "tools_defs.h": "c"
     }
 }

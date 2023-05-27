@@ -44,6 +44,8 @@ int main(int argc, char *argv[]) {
             .ofdm_symbol_size = 2048,
             .get_samples_slot_timestamp = &get_samples_slot_timestamp,
             .get_samples_per_slot = &get_samples_per_slot,
+            .samples_per_frame = 307200,
+            .samples_per_subframe = 30720,
         },
         .nrUE_config = {
             .prach_config = {
@@ -70,6 +72,8 @@ int main(int argc, char *argv[]) {
         },
     };
 
+    ue.txdata = (int32_t **)malloc(1*sizeof(int32_t *));
+    ue.txdata[0] = (int32_t *)malloc(307200*sizeof(int32_t));
     fapi_nr_num_prach_fd_occasions_t tmp_fd_occ_list = {
         .num_prach_fd_occasions = 0,
         .prach_root_sequence_index = 1,

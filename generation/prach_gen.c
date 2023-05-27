@@ -2,9 +2,9 @@
 #include <stdarg.h>
 
 #include "nr_prach.h"
+#include "tools_defs.h"
 
 #define NR_PRACH_DEBUG
-#define AssertFatal(COND, ...) do { if (!COND) {printf(__VA_ARGS__); abort(); }} while(0)
 
 int32_t nr_ru[839];
 int32_t nr_du[839];
@@ -18,7 +18,7 @@ uint16_t *prach_root_sequence_map_abc;
 
 int compute_nr_prach_seq() {}
 int nr_fill_du() {}
-int signal_energy() {}
+
 int max(int a, int b) {
     return a > b;
 }
@@ -397,10 +397,8 @@ int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, int frame, uint8_t slot) {
 
   // This is after cyclic prefix
   prach2 = prach+(2*Ncp); // times 2 for complex samples
-//   const idft_size_idx_t idft_size = get_idft(dftlen);
-printf("abort idft\n");
-abort();
-//   idft(idft_size, prachF, prach, 1);
+  const idft_size_idx_t idft_size = get_idft(dftlen);
+  // idft(idft_size, prachF, prach, 1);
   memmove(prach2, prach, (dftlen<<2));
 
   if (prach_sequence_length == 0) {
@@ -498,5 +496,5 @@ abort();
     LOG_M("Prach_txsig.m","txs",(int16_t*)(&ue->txdata[0][prach_start]), 2*(prach_start+prach_len), 1, 1)
   #endif
 
-  return signal_energy((int*)prach, 256);
+  return 0;//signal_energy((int*)prach, 256);
 }
