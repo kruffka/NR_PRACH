@@ -460,6 +460,8 @@ int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, int frame, uint8_t slot) {
     dftlen = 2048 >> mu;
   }
 
+  if (k >= dftlen) k -= dftlen;
+
   //actually what we should be checking here is how often the current prach crosses a 0.5ms boundary. I am not quite sure for which paramter set this would be the case, so I will ignore it for now and just check if the prach starts on a 0.5ms boundary
   if (fp->numerology_index == 0) {
     if (prachStartSymbol == 0 || prachStartSymbol == 7)
@@ -547,6 +549,7 @@ int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, int frame, uint8_t slot) {
     Xu_im = (((int32_t)Xu[1+(offset<<1)]*amp)>>15);
     prachF[k++]= ((Xu_re*nr_ru[offset2<<1]) - (Xu_im*nr_ru[1+(offset2<<1)]))>>15;
     prachF[k++]= ((Xu_im*nr_ru[offset2<<1]) + (Xu_re*nr_ru[1+(offset2<<1)]))>>15;
+    printf("k: %d Xu(%d + j*(%d)) prachF(%d + j*(%d))\n", k, ((int16_t *)&prachF[0])[k-1], ((int16_t *)&prachF[0])[k], prachF[k-1], prachF[k], Xu_im);
 
     if (k == dftlen) k = 0;
   }

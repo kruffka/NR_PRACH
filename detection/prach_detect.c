@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include "nr_prach.h"
 
-#define NR_PRACH_DEBUG
+// #define NR_PRACH_DEBUG
 
 int detect_nr_prach(int16_t *txdataF, 
                     uint16_t *max_preamble,
@@ -65,7 +65,6 @@ int i;
   prach_ifft        = (int32_t *)malloc(sizeof(int32_t)*2048);
   prachF            = (int16_t *)malloc(sizeof(int32_t)*2048);
 
-
   prach_root_sequence_map = (prach_sequence_length==0) ? prach_root_sequence_map_0_3 : prach_root_sequence_map_abc;
 
   // PDP is oversampled, e.g. 1024 sample instead of 839
@@ -107,11 +106,6 @@ int i;
       }
     }
     // Compute DFT of RX signal (conjugate input, results in conjugate output) for each new rootSequenceIndex
-    // if (LOG_DEBUGFLAG(PRACH)) {
-    //   int en = dB_fixed(signal_energy((int32_t*)&rxsigF[0][0],840));
-    //   if (en>60) LOG_I(PHY,"frame %d, subframe %d : preamble index %d, NCS %d, N_ZC/NCS %d: offset %d, preamble shift %d , en %d)\n",
-		//        frame,subframe,preamble_index,NCS,N_ZC/NCS,preamble_offset,preamble_shift,en);
-    // }
     #ifdef NR_PRACH_DEBUG
       printf("PRACH RX preamble_index %d, preamble_offset %d\n",preamble_index,preamble_offset);
     #endif
@@ -130,7 +124,7 @@ int i;
 
       memset(prachF, 0, sizeof(int16_t)*2*1024 );
       // if (LOG_DUMPFLAG(PRACH)) {      
-	       LOG_M("prach_rxF0.m","prach_rxF0",rxsigF[0],N_ZC,1,1);
+	       LOG_M("prach_rxF0.m","prach_rxF0",rxsigF,N_ZC,1,1);
 	    //    LOG_M("prach_rxF1.m","prach_rxF1",rxsigF[1],6144,1,1);
       // }
    
@@ -157,7 +151,7 @@ int i;
          }
 
         // if (0) {
-          if (aa==0) LOG_M("prach_rxF_comp0.m","prach_rxF_comp0",prachF,1024,1,1);
+        //   if (aa==0) LOG_M("prach_rxF_comp0.m","prach_rxF_comp0",prachF,1024,1,1);
         //   if (aa==1) LOG_M("prach_rxF_comp1.m","prach_rxF_comp1",prachF,1024,1,1);
         // }
 
@@ -185,9 +179,9 @@ int i;
       levdB = dB_fixed_times10(lev);
 
       if (levdB>*max_preamble_energy) {
-        #ifdef NR_PRACH_DEBUG
+        // #ifdef NR_PRACH_DEBUG
   	      printf("preamble_index %d, delay %d en %d dB > %d dB\n",preamble_index,i,levdB,*max_preamble_energy);
-        #endif
+        // #endif
 	      *max_preamble_energy  = levdB;
 	      *max_preamble_delay   = i; // Note: This has to be normalized to the 30.72 Ms/s sampling rate 
 	      *max_preamble         = preamble_index;

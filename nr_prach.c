@@ -563,7 +563,7 @@ int32_t generate_nr_prach(int32_t *txdata, int16_t *txdataF, uint8_t gNB_id, uin
   compute_nr_prach_seq(prach_sequence_length,
                        64,
                        prachrootseqindex, //prachrootseqindex
-                       ue->X_u);
+                       X_u);
 
   // printf("slot %d, slots_per_subframe %d\n", slot, fp->slots_per_subframe);
   if (1){ // slot % (fp->slots_per_subframe / 2) == 0
@@ -631,7 +631,7 @@ int32_t generate_nr_prach(int32_t *txdata, int16_t *txdataF, uint8_t gNB_id, uin
     kbar = 7;
   }
 
-  Xu = (int16_t*)ue->X_u[preamble_offset-first_nonzero_root_idx];
+  Xu = (int16_t*)X_u[preamble_offset-first_nonzero_root_idx];
 
   #if defined (PRACH_WRITE_OUTPUT_DEBUG)
     LOG_M("tx/X_u.m", "X_u", (int16_t*)ue->X_u[preamble_offset-first_nonzero_root_idx], N_ZC, 1, 1);
@@ -667,7 +667,7 @@ if(mu == 0){
       break;
 
     default:
-      AssertFatal(1==0,"sample rate %f MHz not supported for numerology %d\n", 30720 / 1000.0, mu);
+    //   AssertFatal(1==0,"sample rate %f MHz not supported for numerology %d\n", 30720 / 1000.0, mu);
         printf("sample rate %f MHz not supported for numerology %d\n", 30720 / 1000.0, mu);
     }
   }
@@ -702,7 +702,7 @@ if(mu == 0){
     // printf("offset: %d Xu(%d + j*(%d)) offset2 %d\n", offset, Xu_re, Xu_im, offset2);
     prachF[k++]= ((Xu_re*nr_ru[offset2<<1]) - (Xu_im*nr_ru[1+(offset2<<1)]))>>15;
     prachF[k++]= ((Xu_im*nr_ru[offset2<<1]) + (Xu_re*nr_ru[1+(offset2<<1)]))>>15;
-    // printf("k: %d Xu(%d + j*(%d)) prachF(%d + j*(%d))\n", k, ((int16_t *)&prachF[0])[k-1], ((int16_t *)&prachF[0])[k], prachF[k-1], prachF[k], Xu_im);
+    printf("k: %d Xu(%d + j*(%d)) prachF(%d + j*(%d))\n", k, ((int16_t *)&prachF[0])[k-1], ((int16_t *)&prachF[0])[k], prachF[k-1], prachF[k], Xu_im);
 
     if (k==dftlen) k=0;
   }
@@ -718,7 +718,7 @@ if(mu == 0){
   }
 
 
-#if 0 // idft
+#if 1 // idft
 if (mu == 0) {
     switch (samples_per_subframe) {
 
@@ -753,13 +753,13 @@ if (mu == 0) {
 
 
     
-  #ifdef NR_PRACH_DEBUG
+  // #ifdef NR_PRACH_DEBUG
     printf("PRACH [UE %d] N_RB_UL %d prach_start %d, prach_len %d prach_fmt_id %d\n", Mod_id,
       106,
       prach_start,
       prach_len,
       prach_fmt_id);
-  #endif
+  // #endif
 
   for (i=0; i<prach_len; i++) { // prach_len
     ((int16_t*)(&txdata[prach_start]))[2*i] = prach[2*i];
@@ -768,10 +768,10 @@ if (mu == 0) {
 
   }
 
-  #ifdef PRACH_WRITE_OUTPUT_DEBUG
+  // #ifdef PRACH_WRITE_OUTPUT_DEBUG
     // LOG_M("tx/prach_tx0.m", "prachtx0", prach+(Ncp<<1), prach_len-Ncp, 1, 1);
-    LOG_M("tx/Prach_txsig.m","txs",(int16_t*)(&ue->common_vars.txdata[0][prach_start]), 30720, 1, 1);
-  #endif
+    LOG_M("Prach_txsig.m","txs",(int16_t*)(&txdata[prach_start]), 30720, 0);
+  // #endif
 
 #endif
 
@@ -804,12 +804,12 @@ void main() {
 
     int preamble_index = 6;
     const int prach_start = 30720; // in time domain (0 < prach_start+24576 < frame_len)
-    int max_shift = 30720; //30720;
+    int max_shift = 1; //30720;
     
 
     // for (int shift = prach_start; shift < prach_start+max_shift; shift++) {
     for (int shift = prach_start; shift > prach_start-max_shift; shift--) {
-          preamble_index = rand()%63;
+          // preamble_index = rand()%63;
           // printf(">>>>>>>>>>>>>>> PRACH preamble_index %d<<<<<<<<<<<<<<\n", preamble_index);
 
 
@@ -837,34 +837,34 @@ void main() {
       // time domain from nrUE
 
       idft_30720(txdataF, (int16_t *)&txdata[shift]); // 
-      // LOG_M("txdata.m", "tx", txdata, frame_len, 0);
+      LOG_M("txdata.m", "txs", txdata, frame_len, 0);
 
 
       //
       //    Air interface
       //
 
-      for(int i = 0; i < frame_len; i++) {
-        ((int16_t *)&txdata[0])[2*i] += rand()%20-10;
-        ((int16_t *)&txdata[0])[2*i + 1] += rand()%20-10;
-      }
+      // for(int i = 0; i < frame_len; i++) {
+      //   ((int16_t *)&txdata[0])[2*i] += rand()%20-10;
+      //   ((int16_t *)&txdata[0])[2*i + 1] += rand()%20-10;
+      // }
 
       
-      // LOG_M("txdata_gNB.m", "tx_gNB", txdata, frame_len, 0);
+      LOG_M("txdata_gNB.m", "tx_gNB", txdata, frame_len, 0);
 
       // clear txdataF buffer before new dft
       memset(txdataF_gNB, 0, subframe_len*sizeof(int32_t));
 
       // frequency domain at gNB
       dft_30720(txdataF_gNB, (int16_t *)&txdata[prach_start]); // extract txdataF from txdata[30720] - first slot (should be from prach_start)
-      // LOG_M("txdataF_gNB.m", "txF_gNB", txdataF_gNB, subframe_len, 0);
+      LOG_M("txdataF_gNB.m", "txF_gNB", txdataF_gNB, subframe_len, 0);
       
 
       
 
       // >>>>>>>>>>>>>>> PRACH DETECTION <<<<<<<<<<<<<<
       detect_nr_prach(&txdataF_gNB[16952*2], max_preamble, max_preamble_energy, max_preamble_delay);
-      #if 0
+      #if 1
         printf("[RAPROC] Frame %d, slot %d, occasion %d (prachStartSymbol %d) : Most likely preamble %d, energy %d.%d dB delay %d (prach_energy counter %d)\n",
             0,
             0,
@@ -881,10 +881,10 @@ void main() {
       #endif
 
       if (max_preamble[0] == preamble_index) {
-        // printf(">>>>>>>>>>>>>>>>>>>>>>>>> CORRECT!\n");
+        printf(">>>>>>>>>>>>>>>>>>>>>>>>> CORRECT!\n");
         correct++;
       } else {
-        // printf("<<<<<<<<<<<<<<<<<<<<<<< Incorrect!\n");
+        printf("<<<<<<<<<<<<<<<<<<<<<<< Incorrect!\n");
         incorrect++;
       }
     
@@ -1161,4 +1161,3 @@ int i;
 
   return 0;
 }
-

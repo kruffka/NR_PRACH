@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
                 .root_seq_id = 1,
                 .num_cs = 0,
                 .prach_format = 0,
-                .ra_PreambleIndex = 5,
+                .ra_PreambleIndex = 0,
                 .prach_start_symbol = 0,
             },
         },
@@ -98,40 +98,48 @@ int main(int argc, char *argv[]) {
     // ========================== Generate preamble ==========================
     //
     printf("========================== Generate preamble ==========================\n");
-    generate_nr_prach(&ue, 0, 2);
+    generate_nr_prach(&ue, 0, 1);
 
 
     //
-    // ========================== Modulation? ==========================
+    // ========================== Channel Simulation ==========================
     //
-
-    //
-    // ========================== Channel Sim ==========================
-    //
+    printf("========================== Channel Simulation ==========================\n");
     // freq_shift();
     // noise_randn();
     
+    // FILE *file = fopen("../txdata.m", "r");
+    // if (file == NULL) {
+    //   printf("exit no file\n");
+    //   exit(1);
+    // }
 
-    //
-    // ========================== Demodulation? ==========================
-    //
+    // fscanf(file, "txs = [");
 
-    int32_t **txdataF = (int32_t **)malloc16(1*sizeof(int32_t *));
-    txdataF[0] = (int32_t *)malloc16_clear(2048*14*sizeof(int32_t));
+    // for (int i = 0; i < 307200; i++) {
+    //   fscanf(file, "%hd + j*(%hd)\n", &((int16_t *)&ue.txdata[0][0])[2*i], &((int16_t *)&ue.txdata[0][0])[2*i + 1]);
+    // }
+
+    // fclose(file);
+
+    int32_t **rxdataF = (int32_t **)malloc16(1*sizeof(int32_t *));
+    rxdataF[0] = (int32_t *)malloc16_clear(2048*14*sizeof(int32_t));
     uint16_t max_preamble;
     uint16_t max_preamble_energy;
     uint16_t max_preamble_delay;
-    // for (int i = 0; i < 14; i++) {
 
-      dft(DFT_2048, &txdataF[0][0], (int16_t*)(&ue.txdata[0][61440+3184]), 1);
-    // }
-    LOG_M("txdata0.m","txdata",&ue.txdata[0][0], 307200, 1, 1);
-    LOG_M("txdataF0.m","txdataF",&txdataF[0][0], 2048, 1, 1);
+    int offset = 30720;
+    int16_t *rxdata_ptr;
+    rxdata_ptr = (int16_t *)&ue.txdata[0][offset];
+    dft(DFT_24576, rxdata_ptr, (int16_t *)&rxdataF[0][0], 1);
+
+    LOG_M("txdata0.m","txdata", &ue.txdata[0][0], 307200, 1, 1);
+    LOG_M("rxdataF0.m","rxdataF", &rxdataF[0][0], 2048*14, 1, 1);
 
     //
     // ========================== Detection ==========================
     //
     printf("========================== Preamble detection ==========================\n");
-    detect_nr_prach(txdataF[0], &max_preamble, &max_preamble_energy, &max_preamble_delay, ue.X_u);
+    detect_nr_prach(&rxdataF[0][4664], &max_preamble, &max_preamble_energy, &max_preamble_delay, ue.X_u);
 
 }
