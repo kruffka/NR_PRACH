@@ -13,6 +13,10 @@
         "nr_prach.h": "c",
         "sse3.h": "c",
         "random": "c",
-        "tools_defs.h": "c"
+        "tools_defs.h": "c",
+        "vector": "c",
+        "array": "c",
+        "string": "c",
+        "string_view": "c"
     }
 }

@@ -1,23 +1,184 @@
 #include <stdio.h>
-#include <stdarg.h>
-
 #include "nr_prach.h"
-#include "tools_defs.h"
 
 #define NR_PRACH_DEBUG
+#define PRACH_WRITE_OUTPUT_DEBUG
 
-int32_t nr_ru[839];
+const char *prachfmt[]={"0","1","2","3", "A1","A2","A3","B1","B4","C0","C2","A1/B1","A2/B2","A3/B3"};
+
+uint32_t X_u[64][839];
+uint32_t nr_ZC_inv[839];
+
+int16_t nr_ru[2*839];
 int32_t nr_du[839];
-uint16_t *prach_root_sequence_map_0_3;
-uint16_t *prach_root_sequence_map_abc;
 
 #define PHY 0
 // #undef LOG_D
 #define LOG_I(x, ...) printf(__VA_ARGS__)
 #define LOG_D(x, ...) printf(__VA_ARGS__)
 
-int compute_nr_prach_seq() {}
-int nr_fill_du() {}
+
+#define MAX_LEN 307200
+
+void write_matlab(char *filename, char *arrayname, int32_t *array, uint32_t len, int start) {
+  
+  FILE* file = fopen(filename, "w");
+  if(file == NULL) {
+    AssertFatal(1 == 0, "cant open file");
+  }
+
+  if(start + len > MAX_LEN) {
+    AssertFatal(1 == 0, "> max_len");
+  }
+
+  fprintf(file, "%s = [", arrayname);
+  for (int i = 0; i < len; i++) {
+
+
+    // ((int16_t *)&array[start])[2*i] /= 8;
+    // ((int16_t *)&array[start])[2*i + 1] /= 8;
+
+
+    fprintf(file, "%d + j*(%d)\n", ((int16_t *)&array[start])[2*i], ((int16_t *)&array[start])[2*i + 1]);
+  }
+  fprintf(file, "]");
+
+  fclose(file);
+
+}
+
+
+void init_nr_prach_tables(int N_ZC)
+{
+  int i,m;
+
+  // Compute the modular multiplicative inverse 'iu' of u s.t. iu*u = 1 mod N_ZC
+  nr_ZC_inv[0] = 0;
+  nr_ZC_inv[1] = 1;
+
+  for (i=2; i<N_ZC; i++) {
+    for (m=2; m<N_ZC; m++)
+      if (((i*m)%N_ZC) == 1) {
+        nr_ZC_inv[i] = m;
+        break;
+      }
+
+#ifdef NR_PRACH_DEBUG
+
+    if (i<16)
+      printf("i %d : inv %d\n",i,nr_ZC_inv[i]);
+
+#endif
+  }
+
+  // FILE *file = fopen("prach/nr_ru.m", "w");
+  // if(file == NULL){
+  //   exit_fun("PRACH OPEN FILE");
+  // }
+  //   fprintf(file, "nr_ru = [");
+
+  // Compute quantized roots of unity
+  for (i=0; i<N_ZC; i++) {
+    nr_ru[i<<1]     = (int16_t)(floor(32767.0*cos(2*M_PI*(double)i/N_ZC)));
+    nr_ru[1+(i<<1)] = (int16_t)(floor(32767.0*sin(2*M_PI*(double)i/N_ZC)));
+    // printf("%d + j*(%d)\n", nr_ru[i<<1], nr_ru[(i<<1) + 1]);
+    // fprintf(file, "%d + j*(%d)\n", nr_ru[i<<1], nr_ru[(i<<1) + 1]);
+#ifdef NR_PRACH_DEBUG
+
+    if (i<16)
+      printf("i %d : runity %d,%d\n",i,nr_ru[i<<1],nr_ru[1+(i<<1)]);
+
+#endif
+  }
+
+  // fprintf(file, "];");
+  // fclose(file);
+}
+
+// This function computes the du
+void nr_fill_du(uint16_t N_ZC,uint16_t *prach_root_sequence_map)
+{
+
+  uint16_t iu,u,p;
+
+  for (iu=0; iu<(N_ZC-1); iu++) {
+
+    u=prach_root_sequence_map[iu];
+    p=1;
+
+    while (((u*p)%N_ZC)!=1)
+      p++;
+
+    nr_du[u] = ((p<(N_ZC>>1)) ? p : (N_ZC-p));
+  }
+
+}
+
+void compute_nr_prach_seq(uint8_t short_sequence,
+                          uint8_t num_sequences,
+                          uint8_t rootSequenceIndex,
+                          uint32_t X_u[64][839]){
+
+  // Compute DFT of x_u => X_u[k] = x_u(inv(u)*k)^* X_u[k] = exp(j\pi u*inv(u)*k*(inv(u)*k+1)/N_ZC)
+  unsigned int k,inv_u,i;
+  int N_ZC;
+
+  uint16_t *prach_root_sequence_map;
+  uint16_t u;
+
+  #ifdef NR_PRACH_DEBUG
+    printf("compute_prach_seq: prach short sequence %x, num_sequences %d, rootSequenceIndex %d\n", short_sequence, num_sequences, rootSequenceIndex);
+  #endif
+
+  N_ZC = (short_sequence) ? 139 : 839;
+  
+  if (short_sequence) {
+    // FIXME cannot be reached
+    prach_root_sequence_map = prach_root_sequence_map_abc;
+  } else {
+    prach_root_sequence_map = prach_root_sequence_map_0_3;
+  }
+  #ifdef NR_PRACH_DEBUG
+    printf("compute_prach_seq: done init prach_tables\n" );
+  #endif
+
+  for (i=0; i<num_sequences; i++) {
+    int index = (rootSequenceIndex+i) % (N_ZC-1);
+
+    if (short_sequence) {
+      // prach_root_sequence_map points to prach_root_sequence_map4
+    //   DevAssert( index < sizeof(prach_root_sequence_map_abc) / sizeof(prach_root_sequence_map_abc[0]) );
+    if(index > sizeof(prach_root_sequence_map_abc) / sizeof(prach_root_sequence_map_abc[0]))
+        printf("DevAssert( index < sizeof(prach_root_sequence_map_abc) / sizeof(prach_root_sequence_map_abc[0]) );\n");
+    } else {
+      // prach_root_sequence_map points to prach_root_sequence_map0_3
+    //   DevAssert( index < sizeof(prach_root_sequence_map_0_3) / sizeof(prach_root_sequence_map_0_3[0]) );
+    if(index > sizeof(prach_root_sequence_map_abc) / sizeof(prach_root_sequence_map_0_3[0]))
+        printf("DevAssert( index < sizeof(prach_root_sequence_map_0_3) / sizeof(prach_root_sequence_map_0_3[0]) );\n");
+
+    }
+
+    u = prach_root_sequence_map[index];
+    #ifdef NR_PRACH_DEBUG
+      printf("prach index %d => u=%d\n",index,u);
+    #endif
+    inv_u = nr_ZC_inv[u]; // multiplicative inverse of u
+
+
+    // X_u[0] stores the first ZC sequence where the root u has a non-zero number of shifts
+    // for the unrestricted case X_u[0] is the first root indicated by the rootSequenceIndex
+
+    for (k=0; k<N_ZC; k++) {
+      // multiply by inverse of 2 (required since ru is exp[j 2\pi n])
+      X_u[i][k] = ((uint32_t*)nr_ru)[(((k*(1+(inv_u*k)))%N_ZC)*nr_ZC_inv[2])%N_ZC];
+
+      if(i == 0 || i == 1){
+        printf("[%d]: %d + j*(%d)\n", k, ((int16_t *)&X_u[i][0])[2*k], ((int16_t *)&X_u[i][0])[2*k + 1]);
+      }
+    }
+  }
+
+}
 
 int max(int a, int b) {
     return a > b;
@@ -26,9 +187,6 @@ int max(int a, int b) {
 int min(int a, int b) {
     return a < b;
 }
-
-const char *prachfmt[]={"0","1","2","3", "A1","A2","A3","B1","B4","C0","C2","A1/B1","A2/B2","A3/B3"};
-
 
 // Note:
 // - prach_fmt_id is an ID used to map to the corresponding PRACH format value in prachfmt
@@ -207,11 +365,15 @@ int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, int frame, uint8_t slot) {
     kbar = 2;
   }
 
-  if (k<0)
+  if (prach_sequence_length == 0 && prach_fmt_id == 0) {
+    K = 12;
+    kbar = 7;
+  }
+
+  if (k < 0)
     k += fp->ofdm_symbol_size;
 
-  k *= K;
-  k += kbar;
+  k = K * k + kbar;
   k *= 2;
 
   LOG_I(PHY, "PRACH [UE %d] in frame.slot %d.%d, placing PRACH in position %d, msg1 frequency start %d (k1 %d), preamble_offset %d, first_nonzero_root_idx %d\n",
@@ -299,11 +461,10 @@ int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, int frame, uint8_t slot) {
   }
 
   //actually what we should be checking here is how often the current prach crosses a 0.5ms boundary. I am not quite sure for which paramter set this would be the case, so I will ignore it for now and just check if the prach starts on a 0.5ms boundary
-  if(fp->numerology_index == 0) {
+  if (fp->numerology_index == 0) {
     if (prachStartSymbol == 0 || prachStartSymbol == 7)
       Ncp += 16;
-  }
-  else {
+  } else {
     if (slot%(fp->slots_per_subframe/2)==0 && prachStartSymbol == 0)
       Ncp += 16;
   }
@@ -387,18 +548,18 @@ int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, int frame, uint8_t slot) {
     prachF[k++]= ((Xu_re*nr_ru[offset2<<1]) - (Xu_im*nr_ru[1+(offset2<<1)]))>>15;
     prachF[k++]= ((Xu_im*nr_ru[offset2<<1]) + (Xu_re*nr_ru[1+(offset2<<1)]))>>15;
 
-    if (k==dftlen) k=0;
+    if (k == dftlen) k = 0;
   }
 
   #if defined (PRACH_WRITE_OUTPUT_DEBUG)
-    LOG_M("prachF.m", "prachF", &prachF[1804], 1024, 1, 1);
+    LOG_M("prachF.m", "prachF", &prachF[0], dftlen, 1, 1);
     LOG_M("Xu.m", "Xu", Xu, N_ZC, 1, 1);
   #endif
 
   // This is after cyclic prefix
   prach2 = prach+(2*Ncp); // times 2 for complex samples
   const idft_size_idx_t idft_size = get_idft(dftlen);
-  // idft(idft_size, prachF, prach, 1);
+  idft(idft_size, prachF, prach, 1);
   memmove(prach2, prach, (dftlen<<2));
 
   if (prach_sequence_length == 0) {
@@ -493,7 +654,7 @@ int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, int frame, uint8_t slot) {
 
   #ifdef PRACH_WRITE_OUTPUT_DEBUG
     LOG_M("prach_tx0.m", "prachtx0", prach+(Ncp<<1), prach_len-Ncp, 1, 1);
-    LOG_M("Prach_txsig.m","txs",(int16_t*)(&ue->txdata[0][prach_start]), 2*(prach_start+prach_len), 1, 1)
+    LOG_M("Prach_txsig.m","txs",(int16_t*)(&ue->txdata[0][prach_start]), 2*(prach_start+prach_len), 1, 1);
   #endif
 
   return 0;//signal_energy((int*)prach, 256);

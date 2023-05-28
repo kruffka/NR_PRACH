@@ -36,6 +36,9 @@
 #include <malloc.h>
 #include "sse_intrin.h"
 
+#ifndef malloc16
+#    define malloc16(x) memalign(32,x+32)
+#endif
 
 static inline void *malloc16_clear( size_t size ) {
   void *ptr = memalign(32, size+32);
@@ -45,6 +48,7 @@ static inline void *malloc16_clear( size_t size ) {
 }
 
 #define AssertFatal(COND, ...) do { if (!COND) {printf("\n" __VA_ARGS__); abort(); }} while(0)
+#define LOG_M(file, vector, data, len, dec, format) do { write_file_matlab(file, vector, data, len, dec, format, 0);} while(0)
 
 #if defined(__x86_64__) || defined(__i386__)
 #define simd_q15_t __m128i
@@ -662,7 +666,7 @@ typedef enum idft_size_idx {
 #ifdef OAIDFTS_MAIN
 
 #define SZ_PTR(Sz) {dft ## Sz,Sz},
-struct {
+static struct {
   adftfunc_t func;
   int size;
 } dft_ftab[]= {
@@ -670,7 +674,7 @@ struct {
 };
 
 #define SZ_iPTR(Sz)  {idft ## Sz,Sz},
-struct {
+static struct {
   adftfunc_t func;
   int size;
 } idft_ftab[]= {

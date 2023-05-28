@@ -31,11 +31,12 @@ set(CMAKE_CXX_FLAGS
 
 
 
-add_library(oai_dfts SHARED ${COMMON_DIR}/oai_dfts_int.c)
+add_library(oai_dfts SHARED ${COMMON_DIR}/oai_dfts_int.c ${COMMON_DIR}/dB_routines.c)
 
 add_executable(nr_prach ${SRC}/nr_prach.c
                         ${PRACH_UE_SRC}/prach_gen.c
                         ${PRACH_gNB_SRC}/prach_detect.c
+                        ${COMMON_DIR}/write_output.c
                         )
 
 

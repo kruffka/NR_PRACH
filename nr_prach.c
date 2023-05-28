@@ -563,7 +563,7 @@ int32_t generate_nr_prach(int32_t *txdata, int16_t *txdataF, uint8_t gNB_id, uin
   compute_nr_prach_seq(prach_sequence_length,
                        64,
                        prachrootseqindex, //prachrootseqindex
-                       X_u);
+                       ue->X_u);
 
   // printf("slot %d, slots_per_subframe %d\n", slot, fp->slots_per_subframe);
   if (1){ // slot % (fp->slots_per_subframe / 2) == 0
@@ -631,7 +631,7 @@ int32_t generate_nr_prach(int32_t *txdata, int16_t *txdataF, uint8_t gNB_id, uin
     kbar = 7;
   }
 
-  Xu = (int16_t*)X_u[preamble_offset-first_nonzero_root_idx];
+  Xu = (int16_t*)ue->X_u[preamble_offset-first_nonzero_root_idx];
 
   #if defined (PRACH_WRITE_OUTPUT_DEBUG)
     LOG_M("tx/X_u.m", "X_u", (int16_t*)ue->X_u[preamble_offset-first_nonzero_root_idx], N_ZC, 1, 1);

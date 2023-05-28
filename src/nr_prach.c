@@ -46,6 +46,7 @@ int main(int argc, char *argv[]) {
             .get_samples_per_slot = &get_samples_per_slot,
             .samples_per_frame = 307200,
             .samples_per_subframe = 30720,
+            .N_RB_UL = 106,
         },
         .nrUE_config = {
             .prach_config = {
@@ -63,17 +64,17 @@ int main(int argc, char *argv[]) {
             .amp = 512,
             .prach_pdu = {
                 .restricted_set = 0, 
-                .root_seq_id = 0,
+                .root_seq_id = 1,
                 .num_cs = 0,
                 .prach_format = 0,
-                .ra_PreambleIndex = 0,
+                .ra_PreambleIndex = 5,
                 .prach_start_symbol = 0,
             },
         },
     };
 
-    ue.txdata = (int32_t **)malloc(1*sizeof(int32_t *));
-    ue.txdata[0] = (int32_t *)malloc(307200*sizeof(int32_t));
+    ue.txdata = (int32_t **)malloc16(1*sizeof(int32_t *));
+    ue.txdata[0] = (int32_t *)malloc16_clear(307200*sizeof(int32_t));
     fapi_nr_num_prach_fd_occasions_t tmp_fd_occ_list = {
         .num_prach_fd_occasions = 0,
         .prach_root_sequence_index = 1,
@@ -86,6 +87,10 @@ int main(int argc, char *argv[]) {
     memcpy(&ue.nrUE_config.prach_config.num_prach_fd_occasions_list[0], &tmp_fd_occ_list, sizeof(tmp_fd_occ_list));
 
     memset(&ue.X_u[0], 0, 839*sizeof(int32_t));
+
+    dfts_autoinit();
+    init_nr_prach_tables(839);
+
     // init_nr_ue_signal();
 
 
@@ -93,7 +98,7 @@ int main(int argc, char *argv[]) {
     // ========================== Generate preamble ==========================
     //
     printf("========================== Generate preamble ==========================\n");
-    generate_nr_prach(&ue, 0, 0);
+    generate_nr_prach(&ue, 0, 2);
 
 
     //
@@ -111,9 +116,22 @@ int main(int argc, char *argv[]) {
     // ========================== Demodulation? ==========================
     //
 
+    int32_t **txdataF = (int32_t **)malloc16(1*sizeof(int32_t *));
+    txdataF[0] = (int32_t *)malloc16_clear(2048*14*sizeof(int32_t));
+    uint16_t max_preamble;
+    uint16_t max_preamble_energy;
+    uint16_t max_preamble_delay;
+    // for (int i = 0; i < 14; i++) {
+
+      dft(DFT_2048, &txdataF[0][0], (int16_t*)(&ue.txdata[0][61440+3184]), 1);
+    // }
+    LOG_M("txdata0.m","txdata",&ue.txdata[0][0], 307200, 1, 1);
+    LOG_M("txdataF0.m","txdataF",&txdataF[0][0], 2048, 1, 1);
+
     //
     // ========================== Detection ==========================
     //
-    // prach_detection();
+    printf("========================== Preamble detection ==========================\n");
+    detect_nr_prach(txdataF[0], &max_preamble, &max_preamble_energy, &max_preamble_delay, ue.X_u);
 
 }
