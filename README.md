@@ -1,5 +1,7 @@
 #NR_PRACH
-Currently in rework
+Currently in rework  
+  
+Based on OAI source code with changes for my research..  
 
 PRACH Generation and detection
 based on OAI.

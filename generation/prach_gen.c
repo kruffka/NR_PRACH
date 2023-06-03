@@ -1,10 +1,8 @@
 #include <stdio.h>
 #include "nr_prach.h"
 
-#define NR_PRACH_DEBUG
-#define PRACH_WRITE_OUTPUT_DEBUG
-
-const char *prachfmt[]={"0","1","2","3", "A1","A2","A3","B1","B4","C0","C2","A1/B1","A2/B2","A3/B3"};
+// #define NR_PRACH_DEBUG
+// #define PRACH_WRITE_OUTPUT_DEBUG
 
 uint32_t X_u[64][839];
 uint32_t nr_ZC_inv[839];
@@ -172,9 +170,9 @@ void compute_nr_prach_seq(uint8_t short_sequence,
       // multiply by inverse of 2 (required since ru is exp[j 2\pi n])
       X_u[i][k] = ((uint32_t*)nr_ru)[(((k*(1+(inv_u*k)))%N_ZC)*nr_ZC_inv[2])%N_ZC];
 
-      if(i == 0 || i == 1){
-        printf("[%d]: %d + j*(%d)\n", k, ((int16_t *)&X_u[i][0])[2*k], ((int16_t *)&X_u[i][0])[2*k + 1]);
-      }
+      // if(i == 0 || i == 1){
+      //   printf("[%d]: %d + j*(%d)\n", k, ((int16_t *)&X_u[i][0])[2*k], ((int16_t *)&X_u[i][0])[2*k + 1]);
+      // }
     }
   }
 
@@ -460,6 +458,8 @@ int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, int frame, uint8_t slot) {
     dftlen = 2048 >> mu;
   }
 
+  k += dftlen; // fftshift
+
   if (k >= dftlen) k -= dftlen;
 
   //actually what we should be checking here is how often the current prach crosses a 0.5ms boundary. I am not quite sure for which paramter set this would be the case, so I will ignore it for now and just check if the prach starts on a 0.5ms boundary
@@ -539,9 +539,10 @@ int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, int frame, uint8_t slot) {
   #if defined (PRACH_WRITE_OUTPUT_DEBUG)
     LOG_M("X_u.m", "X_u", (int16_t*)ue->X_u[preamble_offset-first_nonzero_root_idx], N_ZC, 1, 1);
   #endif
+  
+  // printf("k = %d\n", k/2);
 
   for (offset=0,offset2=0; offset<N_ZC; offset++,offset2+=preamble_shift) {
-
     if (offset2 >= N_ZC)
       offset2 -= N_ZC;
 
@@ -549,7 +550,7 @@ int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, int frame, uint8_t slot) {
     Xu_im = (((int32_t)Xu[1+(offset<<1)]*amp)>>15);
     prachF[k++]= ((Xu_re*nr_ru[offset2<<1]) - (Xu_im*nr_ru[1+(offset2<<1)]))>>15;
     prachF[k++]= ((Xu_im*nr_ru[offset2<<1]) + (Xu_re*nr_ru[1+(offset2<<1)]))>>15;
-    printf("k: %d Xu(%d + j*(%d)) prachF(%d + j*(%d))\n", k, ((int16_t *)&prachF[0])[k-1], ((int16_t *)&prachF[0])[k], prachF[k-1], prachF[k], Xu_im);
+    // printf("k: %d Xu(%d + j*(%d)) prachF(%d + j*(%d))\n", k, ((int16_t *)&prachF[0])[k-1], ((int16_t *)&prachF[0])[k], prachF[k-1], prachF[k], Xu_im);
 
     if (k == dftlen) k = 0;
   }

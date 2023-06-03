@@ -7,6 +7,8 @@
 #include <stdbool.h>
 #include "tools_defs.h"
 
+static const char *prachfmt[]={"0","1","2","3", "A1","A2","A3","B1","B4","C0","C2","A1/B1","A2/B2","A3/B3"};
+
 //Table 6.3.3.1-3: Mapping from logical index i to sequence number u for preamble formats with L_RA = 839
 static const uint16_t prach_root_sequence_map_0_3[838] = {
 129, 710, 140, 699, 120, 719, 210, 629, 168, 671, 84 , 755, 105, 734, 93 , 746, 70 , 769, 60 , 779,
@@ -213,10 +215,13 @@ typedef struct PHY_VARS_gNB {
     NR_FRAME_PARMS frame_parms;
     int32_t X_u[64][839];
     int32_t **rxdata;
+    int N_TA_offset;
+    int **prach_rxsigF[12]; // NUMBER_OF_NR_RU_PRACH_OCCASIONS_MAX
 
 } PHY_VARS_gNB;
 
-int detect_nr_prach(int16_t *txdataF, 
+int detect_nr_prach(PHY_VARS_gNB *gNB,
+                    int slot,
                     uint16_t *max_preamble,
                     uint16_t *max_preamble_energy,
                     uint16_t *max_preamble_delay,
