@@ -7,8 +7,6 @@
 #include <stdbool.h>
 #include "tools_defs.h"
 
-static const char *prachfmt[]={"0","1","2","3", "A1","A2","A3","B1","B4","C0","C2","A1/B1","A2/B2","A3/B3"};
-
 //Table 6.3.3.1-3: Mapping from logical index i to sequence number u for preamble formats with L_RA = 839
 static const uint16_t prach_root_sequence_map_0_3[838] = {
 129, 710, 140, 699, 120, 719, 210, 629, 168, 671, 84 , 755, 105, 734, 93 , 746, 70 , 769, 60 , 779,
@@ -125,13 +123,10 @@ struct NR_FRAME_PARMS {
   get_samples_slot_timestamp_t get_samples_slot_timestamp;
 };
 
-// NR UE TYPES
-
 // fapi L1 <===> L2
 typedef struct 
 {
-  uint8_t  num_prach_fd_occasions;
-  uint16_t prach_root_sequence_index;//Starting logical root sequence index, 𝑖, equivalent to higher layer parameter prach-RootSequenceIndex [38.211, sec 6.3.3.1] Value: 0 -> 837
+  uint16_t prach_root_sequence_index; //Starting logical root sequence index, 𝑖, equivalent to higher layer parameter prach-RootSequenceIndex [38.211, sec 6.3.3.1] Value: 0 -> 837
   uint8_t  num_root_sequences;//Number of root sequences for a particular FD occasion that are required to generate the necessary number of preambles
   uint16_t k1;//Frequency offset (from UL bandwidth part) for each FD. [38.211, sec 6.3.3.2] Value: from 0 to 272
   uint8_t  prach_zero_corr_conf;//PRACH Zero CorrelationZone Config which is used to dervive 𝑁𝑐𝑠 [38.211, sec 6.3.3.1] Value: from 0 to 15
@@ -146,86 +141,77 @@ typedef struct
   uint8_t prach_sub_c_spacing;//Subcarrier spacing of PRACH. [38.211 sec 4.2] Value:0->4
   uint8_t restricted_set_config;//PRACH restricted set config Value: 0: unrestricted 1: restricted set type A 2: restricted set type B
   uint8_t num_prach_fd_occasions;//Corresponds to the parameter 𝑀 in [38.211, sec 6.3.3.2] which equals the higher layer parameter msg1FDM Value: 1,2,4,8
-  fapi_nr_num_prach_fd_occasions_t* num_prach_fd_occasions_list;
+  fapi_nr_num_prach_fd_occasions_t num_prach_fd_occasions_list[8];
   uint8_t ssb_per_rach;//SSB-per-RACH-occasion Value: 0: 1/8 1:1/4, 2:1/2 3:1 4:2 5:4, 6:8 7:16
   uint8_t prach_multiple_carriers_in_a_band;//0 = disabled 1 = enabled
 
 } fapi_nr_prach_config_t;
 
-typedef struct {
-//   fapi_nr_ue_carrier_config_t carrier_config;
-//   fapi_nr_cell_config_t cell_config;
-//   fapi_nr_ssb_config_t ssb_config;
-//   fapi_nr_ssb_table_t ssb_table;
-//   fapi_nr_tdd_table_t tdd_table;
+typedef struct
+{
+  uint8_t numPRACH_Ocas; // Number of time-domain PRACH occasions within a PRACH slot, [3GPP 38.211 [2], sec 6.3.3.2] Value: 1->7
+  uint8_t prach_Format; // RACH format information for the PRACH occasions signaled in this PDU. This corresponds to one of the supported formats i.e., 0, 1, 2, 3, A1, A2, A3, B1, B4, C0, C2, A1/B1, A2/B2 or A3/B3. [3GPP 38.211 [2], sec 6.3.3.2] 
+  uint8_t indexFD_RA; // Frequency domain occasion index 𝑛𝑛 ∈ {0,1,.., 𝑀 –1}, where 𝑀 equals the higher-layer parameter msg1-FDM which can take values {1,2,4,8} [3GPP TS 38.211 [2], sec 6.3.3.2]
+  uint8_t prach_StartSymbol; // Starting symbol for the first PRACH TD occasion in the current PRACH FD occasion. Corresponds to the parameter. [3GPP TS 38.211 [2], sec 6.3.3.2 and Tables 6.3.3.2-2 to 6.3.3.2-4]
+  uint16_t numCs; // Zero-correlation zone configuration number (RRC parameter zeroCorrelationZoneConfig). Corresponds to the L1 parameter 𝑁𝑁cs. [3GPP TS 38.211 [2], sec 6.3.3.1 and Table 6.3.3.1-5, 6.3.3.1-6 and 6.3.3.1-7]
+  // Beamforming // unused
+} fapi_nr_prach_pdu_t;
+
+typedef struct init_params {
+  NR_FRAME_PARMS frame_parms;
   fapi_nr_prach_config_t prach_config;
+  fapi_nr_num_prach_fd_occasions_t fd_occasions;
+  fapi_nr_prach_pdu_t prach_pdu;
+} init_params_t;
 
-} fapi_nr_config_request_t;
-
-/// This struct replaces:
-/// PRACH-ConfigInfo from 38.331 RRC spec
-/// PRACH-ConfigSIB or PRACH-Config
-typedef struct {
-  /// PHY cell ID
-  uint16_t phys_cell_id;
-  /// Num PRACH occasions
-  uint8_t  num_prach_ocas;
-  /// PRACH format
-  uint8_t  prach_format;
-  /// Num RA
-  uint8_t  num_ra;
-  uint8_t  prach_slot;
-  uint8_t  prach_start_symbol;
-  /// 38.211 (NCS 38.211 6.3.3.1).
-  uint16_t num_cs;
-  /// Parameter: prach-rootSequenceIndex, see TS 38.211 (6.3.3.2).
-  uint16_t root_seq_id;
-  /// Parameter: High-speed-flag, see TS 38.211 (6.3.3.1). 1 corresponds to Restricted set and 0 to Unrestricted set.
-  uint8_t  restricted_set;
-  /// see TS 38.211 (6.3.3.2).
-  uint16_t freq_msg1;
-  /// Preamble index for PRACH (0-63)
-  uint8_t ra_PreambleIndex;
-  /// PRACH TX power (TODO possibly modify to uint)
-  int16_t prach_tx_power;
-} fapi_nr_ul_config_prach_pdu;
-
-typedef struct {
-  int16_t amp;
-  bool active;
-  fapi_nr_ul_config_prach_pdu prach_pdu;
-} NR_UE_PRACH;
+// NR UE TYPES
 
 // phy vars
 typedef struct PHY_VARS_NR_UE {
 
     NR_FRAME_PARMS frame_parms;
-    fapi_nr_config_request_t nrUE_config;
-    NR_UE_PRACH prach_vars;
-    int32_t X_u[64][839];
+    fapi_nr_prach_config_t prach_config;
+    fapi_nr_prach_pdu_t prach_pdu;
+    uint32_t X_u[64][839];
     int32_t **txdata;
 
 } PHY_VARS_NR_UE;
 
-int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, int frame, uint8_t slot);
+int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, int slot, int preamble_index, uint8_t fd_occasion);
+void init_nr_prach_tables(int N_ZC);
+void compute_nr_prach_seq(uint8_t short_sequence,
+                          uint8_t num_sequences,
+                          uint8_t rootSequenceIndex,
+                          uint32_t X_u[64][839]);
 
 // gNB TYPES
+#define NUMBER_OF_NR_PRACH_OCCASIONS_MAX 1 // 12
 typedef struct PHY_VARS_gNB {
 
     NR_FRAME_PARMS frame_parms;
-    int32_t X_u[64][839];
+    fapi_nr_prach_config_t prach_config;
+    fapi_nr_prach_pdu_t prach_pdu;
+    uint32_t X_u[64][839];
     int32_t **rxdata;
     int N_TA_offset;
-    int **prach_rxsigF[12]; // NUMBER_OF_NR_RU_PRACH_OCCASIONS_MAX
+    int16_t **prach_rxsigF_i[NUMBER_OF_NR_PRACH_OCCASIONS_MAX];
+    float **prach_rxsigF_f[NUMBER_OF_NR_PRACH_OCCASIONS_MAX];
 
 } PHY_VARS_gNB;
 
-int detect_nr_prach(PHY_VARS_gNB *gNB,
+int detect_nr_prach_i(PHY_VARS_gNB *gNB,
                     int slot,
+                    int fd_occasion,
                     uint16_t *max_preamble,
                     uint16_t *max_preamble_energy,
-                    uint16_t *max_preamble_delay,
-                    uint32_t X_u[64][839]);
+                    uint16_t *max_preamble_delay);
+
+int detect_nr_prach_i(PHY_VARS_gNB *gNB,
+                    int slot,
+                    int fd_occasion,
+                    uint16_t *max_preamble,
+                    uint16_t *max_preamble_energy,
+                    uint16_t *max_preamble_delay);
 
 
 #endif // __NR_PRACH_H__

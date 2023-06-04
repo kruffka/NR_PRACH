@@ -8942,7 +8942,23 @@ int dfts_autoinit(void)
 
 #ifndef MR_MAIN
 
-void dft(uint8_t sizeidx, int16_t *input,int16_t *output,unsigned char scale_flag){
+#define SZ_PTR(Sz) {dft ## Sz,Sz},
+static struct {
+  adftfunc_t func;
+  int size;
+} dft_ftab[]= {
+  FOREACH_DFTSZ(SZ_PTR)
+};
+
+#define SZ_iPTR(Sz)  {idft ## Sz,Sz},
+static struct {
+  adftfunc_t func;
+  int size;
+} idft_ftab[]= {
+  FOREACH_IDFTSZ(SZ_iPTR)
+};
+
+void dft_oai(uint8_t sizeidx, int16_t *input,int16_t *output,unsigned char scale_flag){
 	AssertFatal((sizeidx >= 0 && sizeidx<DFT_SIZE_IDXTABLESIZE),"Invalid dft size index %i\n",sizeidx);
         int algn=0xF;
         if ( (dft_ftab[sizeidx].size%3) != 0 ) // there is no AVX2 implementation for multiples of 3 DFTs
@@ -8960,7 +8976,7 @@ void dft(uint8_t sizeidx, int16_t *input,int16_t *output,unsigned char scale_fla
           dft_ftab[sizeidx].func(input,output,scale_flag);
 };
 
-void idft(uint8_t sizeidx, int16_t *input,int16_t *output,unsigned char scale_flag){
+void idft_oai(uint8_t sizeidx, int16_t *input,int16_t *output,unsigned char scale_flag){
 	AssertFatal((sizeidx>=0 && sizeidx<DFT_SIZE_IDXTABLESIZE),"Invalid idft size index %i\n",sizeidx);
         int algn=0xF;
 	algn=0x1F;

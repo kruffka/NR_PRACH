@@ -16,8 +16,8 @@ set(COMMON_DIR "${CMAKE_CURRENT_SOURCE_DIR}/common")
 #sudo scp -r simde/ /usr/include/
 
 
-  set(CMAKE_C_FLAGS "-g3 -O0")
-  set(CMAKE_CXX_FLAGS "-g3 -O0")
+  set(CMAKE_C_FLAGS "-g3 -O0 -Wunused")
+  set(CMAKE_CXX_FLAGS "-g3 -O0 -Wunused")
 
 
 
@@ -32,6 +32,8 @@ set(CMAKE_CXX_FLAGS
 
 
 add_library(oai_dfts SHARED ${COMMON_DIR}/oai_dfts_int.c ${COMMON_DIR}/dB_routines.c)
+add_library(fftw3_dfts SHARED ${COMMON_DIR}/fftw.c)
+# add_dependencies(fftw3_dfts fftw3)
 
 add_executable(nr_prach ${SRC}/nr_prach.c
                         ${PRACH_UE_SRC}/prach_gen.c
@@ -40,4 +42,4 @@ add_executable(nr_prach ${SRC}/nr_prach.c
                         )
 
 
-target_link_libraries(nr_prach oai_dfts m)
+target_link_libraries(nr_prach oai_dfts m fftw3_dfts fftw3)

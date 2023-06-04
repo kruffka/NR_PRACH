@@ -47,6 +47,14 @@ static inline void *malloc16_clear( size_t size ) {
   return ptr;
 }
 
+int write_file_matlab(const char *fname,
+		              const char *vname,
+					  void *data,
+					  int length,
+					  int dec,
+					  unsigned int format,
+            int multiVec);
+
 #define AssertFatal(COND, ...) do { if (!COND) {printf("\n" __VA_ARGS__); abort(); }} while(0)
 #define LOG_M(file, vector, data, len, dec, format) do { write_file_matlab(file, vector, data, len, dec, format, 0);} while(0)
 
@@ -663,25 +671,6 @@ typedef enum idft_size_idx {
   IDFT_SIZE_IDXTABLESIZE
 }  idft_size_idx_t;
 
-#ifdef OAIDFTS_MAIN
-
-#define SZ_PTR(Sz) {dft ## Sz,Sz},
-static struct {
-  adftfunc_t func;
-  int size;
-} dft_ftab[]= {
-  FOREACH_DFTSZ(SZ_PTR)
-};
-
-#define SZ_iPTR(Sz)  {idft ## Sz,Sz},
-static struct {
-  adftfunc_t func;
-  int size;
-} idft_ftab[]= {
-  FOREACH_IDFTSZ(SZ_iPTR)
-};
-
-#endif
 
 /*******************************************************************
 *
@@ -865,6 +854,9 @@ c32_t dot_product(const c16_t *x,
 
 double interp(double x, double *xs, double *ys, int count);
 
+void dft_oai(uint8_t sizeidx, int16_t *input,int16_t *output,unsigned char scale_flag);
+void idft_oai(uint8_t sizeidx, int16_t *input,int16_t *output,unsigned char scale_flag);
+int dfts_autoinit(void);
 
 #ifdef __cplusplus
 }
