@@ -850,6 +850,8 @@ c32_t dot_product(const c16_t *x,
                   const int output_shift);
 
 /** @} */
+int dft_fftw3(int size, float *input, float *output);
+int idft_fftw3(int size, float *input, float *output);
 
 
 double interp(double x, double *xs, double *ys, int count);

@@ -16,36 +16,6 @@ int32_t nr_du[839];
 #define LOG_D(x, ...) printf(__VA_ARGS__)
 
 
-#define MAX_LEN 307200
-
-void write_matlab(char *filename, char *arrayname, int32_t *array, uint32_t len, int start) {
-  
-  FILE* file = fopen(filename, "w");
-  if(file == NULL) {
-    AssertFatal(1 == 0, "cant open file");
-  }
-
-  if(start + len > MAX_LEN) {
-    AssertFatal(1 == 0, "> max_len");
-  }
-
-  fprintf(file, "%s = [", arrayname);
-  for (int i = 0; i < len; i++) {
-
-
-    // ((int16_t *)&array[start])[2*i] /= 8;
-    // ((int16_t *)&array[start])[2*i + 1] /= 8;
-
-
-    fprintf(file, "%d + j*(%d)\n", ((int16_t *)&array[start])[2*i], ((int16_t *)&array[start])[2*i + 1]);
-  }
-  fprintf(file, "]");
-
-  fclose(file);
-
-}
-
-
 void init_nr_prach_tables(int N_ZC)
 {
   int i,m;
@@ -145,14 +115,17 @@ void compute_nr_prach_seq(uint8_t short_sequence,
 
     if (short_sequence) {
       // prach_root_sequence_map points to prach_root_sequence_map4
-    //   DevAssert( index < sizeof(prach_root_sequence_map_abc) / sizeof(prach_root_sequence_map_abc[0]) );
-    if(index > sizeof(prach_root_sequence_map_abc) / sizeof(prach_root_sequence_map_abc[0]))
-        printf("DevAssert( index < sizeof(prach_root_sequence_map_abc) / sizeof(prach_root_sequence_map_abc[0]) );\n");
+      if(index > sizeof(prach_root_sequence_map_abc) / sizeof(prach_root_sequence_map_abc[0])) {
+          printf("index > sizeof(prach_root_sequence_map_abc) / sizeof(prach_root_sequence_map_abc[0])\n");
+          abort();
+      }
+ 
     } else {
       // prach_root_sequence_map points to prach_root_sequence_map0_3
-    //   DevAssert( index < sizeof(prach_root_sequence_map_0_3) / sizeof(prach_root_sequence_map_0_3[0]) );
-    if(index > sizeof(prach_root_sequence_map_abc) / sizeof(prach_root_sequence_map_0_3[0]))
-        printf("DevAssert( index < sizeof(prach_root_sequence_map_0_3) / sizeof(prach_root_sequence_map_0_3[0]) );\n");
+      if(index > sizeof(prach_root_sequence_map_abc) / sizeof(prach_root_sequence_map_0_3[0])) {
+          printf("index > sizeof(prach_root_sequence_map_0_3) / sizeof(prach_root_sequence_map_0_3[0])\n");
+          abort();
+      }
 
     }
 
@@ -170,11 +143,13 @@ void compute_nr_prach_seq(uint8_t short_sequence,
       // multiply by inverse of 2 (required since ru is exp[j 2\pi n])
       X_u[i][k] = ((uint32_t*)nr_ru)[(((k*(1+(inv_u*k)))%N_ZC)*nr_ZC_inv[2])%N_ZC];
 
-      // if(i == 0 || i == 1){
-      //   printf("[%d]: %d + j*(%d)\n", k, ((int16_t *)&X_u[i][0])[2*k], ((int16_t *)&X_u[i][0])[2*k + 1]);
+
+      // if(i == 0 && k < 10){
+      //   printf("[%d]: %d + j*(%d) %d\n", k, ((int16_t *)&X_u[i][0])[2*k], ((int16_t *)&X_u[i][0])[2*k + 1], (((k*(1+(inv_u*k)))%N_ZC)*nr_ZC_inv[2])%N_ZC);
       // }
     }
   }
+  // printf("\n");
 
 }
 
@@ -548,6 +523,7 @@ int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, int slot, int ra_PreambleIndex, ui
     Xu_im = (((int32_t)Xu[1+(offset<<1)]*amp)>>15);
     prachF[k++]= ((Xu_re*nr_ru[offset2<<1]) - (Xu_im*nr_ru[1+(offset2<<1)]))>>15;
     prachF[k++]= ((Xu_im*nr_ru[offset2<<1]) + (Xu_re*nr_ru[1+(offset2<<1)]))>>15;
+    // if (offset < 10)
     // printf("k: %d Xu(%d + j*(%d)) prachF(%d + j*(%d))\n", k, ((int16_t *)&prachF[0])[k-1], ((int16_t *)&prachF[0])[k], prachF[k-1], prachF[k], Xu_im);
 
     if (k == dftlen) k = 0;

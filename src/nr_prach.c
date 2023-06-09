@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <complex.h>
 #include "nr_prach.h"
 
 // #define MAIN_DEBUG
@@ -29,11 +30,10 @@ uint32_t get_samples_slot_timestamp(int slot, NR_FRAME_PARMS *fp, uint8_t sl_ahe
   return samp_count;
 }
 
-void init_nr_ue_signal(PHY_VARS_NR_UE *ue, PHY_VARS_gNB *gNB, init_params_t *config) {
+void init_nr_signal(PHY_VARS_NR_UE *ue, PHY_VARS_gNB *gNB, init_params_t *config) {
 
   int nb_rx = config->frame_parms.nb_antennas_rx;
   int N_ZC = (config->prach_config.prach_sequence_length == 0) ? 839:139;
-  fapi_nr_prach_config_t *prach_config = &config->prach_config;
 
   ue->txdata = (int32_t **)malloc16(nb_rx*sizeof(int32_t *));
   if (ue->txdata == NULL) {
@@ -41,15 +41,22 @@ void init_nr_ue_signal(PHY_VARS_NR_UE *ue, PHY_VARS_gNB *gNB, init_params_t *con
     exit(1);
   }
 
-  gNB->rxdata = (int32_t **)malloc16(nb_rx*sizeof(int32_t *));
-  if (gNB->rxdata == NULL) {
+  gNB->rxdata_int = (int32_t **)malloc16(nb_rx*sizeof(int32_t *));
+  if (gNB->rxdata_int == NULL) {
+    printf("Error malloc in %s:%d\n", __FILE__, __LINE__);
+    exit(1);
+  }
+
+  gNB->rxdata_float = (float **)malloc16(nb_rx*sizeof(float *));
+  if (gNB->rxdata_float == NULL) {
     printf("Error malloc in %s:%d\n", __FILE__, __LINE__);
     exit(1);
   }
 
   for (int aa = 0; aa < nb_rx; aa++) {
     ue->txdata[aa] = (int32_t *)malloc16_clear(307200*sizeof(int32_t)); 
-    gNB->rxdata[aa] = (int32_t *)malloc16_clear(307200*sizeof(int32_t));
+    gNB->rxdata_int[aa] = (int32_t *)malloc16_clear(307200*sizeof(int32_t));
+    gNB->rxdata_float[aa] = (float *)malloc16_clear(307200*sizeof(float));
   }
 
   for (int occ = 0; occ < NUMBER_OF_NR_PRACH_OCCASIONS_MAX; occ++) {
@@ -73,24 +80,36 @@ void init_nr_ue_signal(PHY_VARS_NR_UE *ue, PHY_VARS_gNB *gNB, init_params_t *con
 
   dfts_autoinit();
   init_nr_prach_tables(N_ZC);
+  init_nr_prach_tables_float(N_ZC);
 
   ue->frame_parms = gNB->frame_parms = config->frame_parms;
   ue->prach_config = gNB->prach_config = config->prach_config;
   ue->prach_pdu = gNB->prach_pdu = config->prach_pdu;
 
+  
+  compute_nr_prach_seq(gNB->prach_config.prach_sequence_length,
+                             gNB->prach_config.num_prach_fd_occasions_list[0].num_root_sequences,
+                             gNB->prach_config.num_prach_fd_occasions_list[0].prach_root_sequence_index,
+                             gNB->X_u);
+
+  compute_nr_prach_seq_float(gNB->prach_config.prach_sequence_length,
+                             gNB->prach_config.num_prach_fd_occasions_list[0].num_root_sequences,
+                             gNB->prach_config.num_prach_fd_occasions_list[0].prach_root_sequence_index,
+                             gNB->X_u_float);
+
 }
 
-void deinit_nr_ue_signal(PHY_VARS_NR_UE *ue, PHY_VARS_gNB *gNB) {
+void deinit_nr_signal(PHY_VARS_NR_UE *ue, PHY_VARS_gNB *gNB) {
     
     int nb_rx = ue->frame_parms.nb_antennas_rx;
 
     for (int aa = 0; aa < nb_rx; aa++) {
       free(ue->txdata[aa]); 
-      free(gNB->rxdata[aa]);
+      free(gNB->rxdata_int[aa]);
     }
 
     free(ue->txdata);
-    free(gNB->rxdata);
+    free(gNB->rxdata_int);
 
     for (int occ = 0; occ < NUMBER_OF_NR_PRACH_OCCASIONS_MAX; occ++) {
       for (int aa = 0; aa < nb_rx; aa++) {
@@ -106,9 +125,15 @@ void deinit_nr_ue_signal(PHY_VARS_NR_UE *ue, PHY_VARS_gNB *gNB) {
 
 int main(int argc, char *argv[]) {
 
-    // if (argc < 2) {
-    //     printf("Usage: ./nr_prach\n");
-    // }
+    if (argc < 3) {
+      printf("Usage: ./nr_prach is_float tries\n");
+      exit(0);
+    }
+
+    int gNB_float = atoi(argv[1]);
+    int tries = atoi(argv[2]);
+    int ra_PreambleIndex = 7;
+
 
     //
     // ========================== Init frame params and buffers ==========================
@@ -123,11 +148,8 @@ int main(int argc, char *argv[]) {
     uint16_t max_preamble;
     uint16_t max_preamble_energy;
     uint16_t max_preamble_delay;
-    int ra_PreambleIndex = 7;
-    int slot = 1;
-    int gNB_float = 0;
+    int slot = 5;
     int fd_occasion = 0;
-    int tries = 64;
     int success = 0;
     gNB.N_TA_offset = 0;
 
@@ -168,7 +190,7 @@ int main(int argc, char *argv[]) {
     };
 
 
-    init_nr_ue_signal(&ue, &gNB, &frame_and_prach_config);
+    init_nr_signal(&ue, &gNB, &frame_and_prach_config);
 
     if (tries > 64 || tries < 0) 
       AssertFatal(1 == 0, "Error, nof preamble idx only 0..63; tries %d\n", tries);
@@ -195,11 +217,19 @@ int main(int argc, char *argv[]) {
       // noise_randn();
       
 
-
-      // LOG_M("txdata0.m","txdata", &ue.txdata[0][0], 307200, 1, 1);
       // LOG_M("rxdataF0.m","rxdataF", &rxdataF[0][0], 2048*14, 1, 1);
 
-      memcpy(&gNB.rxdata[0][0], &ue.txdata[0][0], sizeof(int32_t)*ue.frame_parms.samples_per_frame);
+    memcpy(&gNB.rxdata_int[0][0], &ue.txdata[0][0], sizeof(int32_t)*ue.frame_parms.samples_per_frame);
+
+    for (int aa = 0; aa < gNB.frame_parms.nb_antennas_rx; aa++) {
+      for (int i = 30720*slot; i < 30720*slot+30720; i++) {
+        gNB.rxdata_float[aa][2*i] = (float)((int16_t *)&ue.txdata[0][0])[2*i] / 32767.0;
+        gNB.rxdata_float[aa][2*i+1] = (float)((int16_t *)&ue.txdata[0][0])[2*i + 1] / 32767.0;
+      }
+    }
+
+    // LOG_M("rxdata0_int.m", "rxdata", &ue.txdata[0][0], 30720*2, 1, 1);
+    // LOG_M("rxdata0_float.m","rxdata", &gNB.rxdata_float[0][0], 30720*2, 1, 13);
 
 
 #ifdef MAIN_DEBUG
@@ -208,16 +238,12 @@ int main(int argc, char *argv[]) {
       //
 #endif
 
-      max_preamble = 0;
-      max_preamble_energy = 0;
-      max_preamble_delay = 0;
-
       if (gNB_float)
-        detect_nr_prach_f(&gNB, slot, fd_occasion, &max_preamble, &max_preamble_energy, &max_preamble_delay);
+        detect_nr_prach_float(&gNB, slot, fd_occasion, &max_preamble, &max_preamble_energy, &max_preamble_delay);
       else
-        detect_nr_prach_i(&gNB, slot, fd_occasion, &max_preamble, &max_preamble_energy, &max_preamble_delay);
+        detect_nr_prach_int(&gNB, slot, fd_occasion, &max_preamble, &max_preamble_energy, &max_preamble_delay);
 
-      if (max_preamble == ra_PreambleIndex) {
+      if (max_preamble == ra_PreambleIndex && max_preamble_energy > 0) {
         printf("SUCCESS!!! idx = %d, delay = %d, energy = %d\n", max_preamble, max_preamble_delay, max_preamble_energy);
         success++;
       } else {
@@ -226,5 +252,5 @@ int main(int argc, char *argv[]) {
     }
     printf("Results: %d/%d\n", success, tries);
 
-    deinit_nr_ue_signal(&ue, &gNB);
+    deinit_nr_signal(&ue, &gNB);
 }

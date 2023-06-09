@@ -1,25 +1,149 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <math.h>
 #include "nr_prach.h"
 
 const char *prachfmt[]={"0","1","2","3", "A1","A2","A3","B1","B4","C0","C2","A1/B1","A2/B2","A3/B3"};
 
-// #define NR_PRACH_DEBUG
+#define NR_PRACH_DEBUG
+uint32_t nr_ZC_inv[839];
 
-// prach detection int realisation
-int detect_nr_prach_i(PHY_VARS_gNB *gNB,
-                      int slot,
-                      int fd_occasion,
-                      uint16_t *max_preamble,
-                      uint16_t *max_preamble_energy,
-                      uint16_t *max_preamble_delay) {
+static float nr_ru[2*839];
+
+
+void init_nr_prach_tables_float(int N_ZC)
+{
+  int i,m;
+
+  // Compute the modular multiplicative inverse 'iu' of u s.t. iu*u = 1 mod N_ZC
+  nr_ZC_inv[0] = 0;
+  nr_ZC_inv[1] = 1;
+
+  for (i=2; i<N_ZC; i++) {
+    for (m=2; m<N_ZC; m++)
+      if (((i*m)%N_ZC) == 1) {
+        nr_ZC_inv[i] = m;
+        break;
+      }
+
+#ifdef NR_PRACH_DEBUG
+
+    if (i<16)
+      printf("i %d : inv %d\n",i,nr_ZC_inv[i]);
+
+#endif
+  }
+
+  // FILE *file = fopen("prach/nr_ru.m", "w");
+  // if(file == NULL){
+  //   exit_fun("PRACH OPEN FILE");
+  // }
+  //   fprintf(file, "nr_ru = [");
+
+  // Compute quantized roots of unity
+  for (i=0; i<N_ZC; i++) {
+    nr_ru[i<<1]     = cosf(2*M_PI*(float)i/N_ZC);
+    nr_ru[1+(i<<1)] = sinf(2*M_PI*(float)i/N_ZC);
+    // printf("%d + j*(%d)\n", nr_ru[i<<1], nr_ru[(i<<1) + 1]);
+    // fprintf(file, "%d + j*(%d)\n", nr_ru[i<<1], nr_ru[(i<<1) + 1]);
+#ifdef NR_PRACH_DEBUG
+
+    if (i<16)
+      printf("i %d : runity %f,%f\n",i,nr_ru[i<<1],nr_ru[1+(i<<1)]);
+
+#endif
+  }
+
+  // fprintf(file, "];");
+  // fclose(file);
+}
+
+
+void compute_nr_prach_seq_float(uint8_t short_sequence,
+                                uint8_t num_sequences,
+                                uint8_t rootSequenceIndex,
+                                float X_u[64][839*2]) {
+
+  // Compute DFT of x_u => X_u[k] = x_u(inv(u)*k)^* X_u[k] = exp(j\pi u*inv(u)*k*(inv(u)*k+1)/N_ZC)
+  unsigned int k,inv_u,i;
+  int N_ZC;
+
+  const uint16_t *prach_root_sequence_map;
+  uint16_t u;
+
+  #ifdef NR_PRACH_DEBUG
+    printf("compute_prach_seq: prach short sequence %x, num_sequences %d, rootSequenceIndex %d\n", short_sequence, num_sequences, rootSequenceIndex);
+  #endif
+
+  N_ZC = (short_sequence) ? 139 : 839;
+  
+  if (short_sequence) {
+    // FIXME cannot be reached
+    prach_root_sequence_map = prach_root_sequence_map_abc;
+  } else {
+    prach_root_sequence_map = prach_root_sequence_map_0_3;
+  }
+  #ifdef NR_PRACH_DEBUG
+    printf("compute_prach_seq: done init prach_tables\n" );
+  #endif
+
+  for (i=0; i<num_sequences; i++) {
+    int index = (rootSequenceIndex+i) % (N_ZC-1);
+
+    if (short_sequence) {
+      // prach_root_sequence_map points to prach_root_sequence_map4
+      if(index > sizeof(prach_root_sequence_map_abc) / sizeof(prach_root_sequence_map_abc[0])) {
+          printf("index > sizeof(prach_root_sequence_map_abc) / sizeof(prach_root_sequence_map_abc[0])\n");
+          abort();
+      }
+ 
+    } else {
+      // prach_root_sequence_map points to prach_root_sequence_map0_3
+      if(index > sizeof(prach_root_sequence_map_abc) / sizeof(prach_root_sequence_map_0_3[0])) {
+          printf("index > sizeof(prach_root_sequence_map_0_3) / sizeof(prach_root_sequence_map_0_3[0])\n");
+          abort();
+      }
+
+    }
+
+    u = prach_root_sequence_map[index];
+    #ifdef NR_PRACH_DEBUG
+      printf("prach index %d => u=%d\n",index,u);
+    #endif
+    inv_u = nr_ZC_inv[u]; // multiplicative inverse of u
+
+
+    // X_u[0] stores the first ZC sequence where the root u has a non-zero number of shifts
+    // for the unrestricted case X_u[0] is the first root indicated by the rootSequenceIndex
+
+    for (k=0; k<N_ZC; k++) {
+      // multiply by inverse of 2 (required since ru is exp[j 2\pi n])
+      X_u[i][2*k] = nr_ru[(((k*(1+(inv_u*k)))%N_ZC)*nr_ZC_inv[2])%N_ZC*2];
+      X_u[i][2*k+1] = nr_ru[(((k*(1+(inv_u*k)))%N_ZC)*nr_ZC_inv[2])%N_ZC*2+1];
+
+      // if(i == 0 && k < 10){
+
+      //   printf("[%d]: %f + j*(%f) %d\n", k, X_u[i][2*k], X_u[i][2*k + 1], (((k*(1+(inv_u*k)))%N_ZC)*nr_ZC_inv[2])%N_ZC);
+      // }
+    }
+  }
+
+}
+
+// prach detection int
+int detect_nr_prach_int(PHY_VARS_gNB *gNB,
+                        int slot,
+                        int fd_occasion,
+                        uint16_t *max_preamble,
+                        uint16_t *max_preamble_energy,
+                        uint16_t *max_preamble_delay) {
 
   NR_FRAME_PARMS *fp = &gNB->frame_parms;
 
   uint8_t  preamble_index, n_ra_prb = 0xFF, new_dft = 0, aa;      
   uint16_t NCS2, preamble_offset = 0, preamble_offset_old, offset;
   uint16_t preamble_shift = 0, preamble_shift2, first_nonzero_root_idx = 0;
-  int16_t *prachF = NULL, *Xu = 0, levdB;
+  int16_t *Xu = 0, levdB;
   int32_t lev;
 
   int slot2 = slot;
@@ -38,6 +162,7 @@ int detect_nr_prach_i(PHY_VARS_gNB *gNB,
   int32_t *prach_ifft = (int32_t*)NULL;
   int16_t *prach[nb_rx];
   int16_t prach_ifft_tmp[2048*2] __attribute__((aligned(32)));
+  int16_t *prachF = NULL;
 
   if (prachStartSymbol == 0) {
     sample_offset_slot = 0;
@@ -53,17 +178,12 @@ int detect_nr_prach_i(PHY_VARS_gNB *gNB,
       sample_offset_slot = (fp->ofdm_symbol_size + fp->nb_prefix_samples) * prachStartSymbol;
   }
 #ifdef NR_PRACH_DEBUG
-  printf("In slot %d: doing rx_nr_prach_ru for format %d, numRA %d, prachStartSymbol %d, fd_occasion %d\n",slot,prachFormat,numRA,prachStartSymbol,fd_occasion);
+  printf("In slot %d: doing rx_nr_prach_ru for format %d, prachStartSymbol %d, fd_occasion %d\n",slot,prachFormat,prachStartSymbol,fd_occasion);
 #endif
-
-  compute_nr_prach_seq(gNB->prach_config.prach_sequence_length,
-                       gNB->prach_config.num_prach_fd_occasions_list[fd_occasion].num_root_sequences,
-                       gNB->prach_config.num_prach_fd_occasions_list[fd_occasion].prach_root_sequence_index,
-                       gNB->X_u);
 
   for (int aa=0; aa<fp->nb_antennas_rx; aa++){ 
     if (prach_sequence_length == 0) slot2=(slot/fp->slots_per_subframe)*fp->slots_per_subframe; 
-    prach[aa] = (int16_t*)&gNB->rxdata[aa][fp->get_samples_slot_timestamp(slot2,fp,0)+sample_offset_slot-gNB->N_TA_offset];
+    prach[aa] = (int16_t*)&gNB->rxdata_int[aa][fp->get_samples_slot_timestamp(slot2,fp,0)+sample_offset_slot-gNB->N_TA_offset];
   } 
 
   if (prach_sequence_length == 0) {
@@ -265,7 +385,6 @@ int detect_nr_prach_i(PHY_VARS_gNB *gNB,
     printf("Doing PRACH combining of %d reptitions N_ZC %d\n",reps,N_ZC);
 #endif
     int16_t rxsigF_tmp[N_ZC<<1];
-    //    if (k+N_ZC > dftlen) { // PRACH signal is split around DC 
     int16_t *rxsigF2=rxsigF[aa];
     int k2=k<<1;
 
@@ -276,12 +395,12 @@ int detect_nr_prach_i(PHY_VARS_gNB *gNB,
     }
     memcpy((void*)rxsigF2,(void *)rxsigF_tmp,N_ZC<<2);
   }
-    // rxsigF[aa] = &rxsigF[aa][2048*2*2];
-    LOG_M("ru_rxsigF_tmp.m","rxsFtmp", rxsigF[aa], dftlen*2*reps, 1, 1);
+
+  // LOG_M("ru_rxsigF_tmp.m","rxsFtmp", rxsigF[aa], dftlen*2*reps, 1, 1);
 
   #ifdef NR_PRACH_DEBUG
-    printf("L1 PRACH RX: rooSequenceIndex %d, numRootSeqeuences %d, NCS %d, N_ZC %d, format %d \n",rootSequenceIndex,numrootSequenceIndex,NCS,N_ZC,prachFormat);
-    printf("PRACH (gNB) : running rx_prach for slot %d, msg1_frequencystart %d, rootSequenceIndex %d\n", slot, msg1_frequencystart,rootSequenceIndex);
+    printf("L1 PRACH RX: rooSequenceIndex %d, numRootSeqeuences %d, NCS %d, N_ZC %d, format %d \n", gNB->prach_config.num_prach_fd_occasions_list[fd_occasion].prach_root_sequence_index,gNB->prach_config.num_prach_fd_occasions_list[fd_occasion].num_root_sequences,NCS,N_ZC,prachFormat);
+    printf("PRACH (gNB) : running rx_prach for slot %d, msg1_frequencystart %d\n", slot, msg1_frequencystart);
   #endif
 
   prach_ifft        = (int32_t *)malloc(sizeof(int32_t)*2048);
@@ -371,7 +490,7 @@ int detect_nr_prach_i(PHY_VARS_gNB *gNB,
          }
 
         // if (0) {
-        //   if (aa==0) LOG_M("prach_rxF_comp0.m","prach_rxF_comp0",prachF,1024,1,1);
+          // LOG_M("prach_rxF_comp0.m","prach_rxF_comp0",prachF,1024,1,1);
         //   if (aa==1) LOG_M("prach_rxF_comp1.m","prach_rxF_comp1",prachF,1024,1,1);
         // }
 
@@ -443,20 +562,22 @@ int detect_nr_prach_i(PHY_VARS_gNB *gNB,
 }
 
 
-int detect_nr_prach_f(PHY_VARS_gNB *gNB,
-                      int slot,
-                      int fd_occasion,
-                      uint16_t *max_preamble,
-                      uint16_t *max_preamble_energy,
-                      uint16_t *max_preamble_delay) {
+int detect_nr_prach_float(PHY_VARS_gNB *gNB,
+                          int slot,
+                          int fd_occasion,
+                          uint16_t *max_preamble,
+                          uint16_t *max_preamble_energy,
+                          uint16_t *max_preamble_delay) {
 
   NR_FRAME_PARMS *fp = &gNB->frame_parms;
 
   uint8_t  preamble_index, n_ra_prb = 0xFF, new_dft = 0, aa;      
   uint16_t NCS2, preamble_offset = 0, preamble_offset_old, offset;
   uint16_t preamble_shift = 0, preamble_shift2, first_nonzero_root_idx = 0;
-  int16_t *prachF = NULL, *Xu = 0, levdB;
-  int32_t lev;
+  float *Xu = 0;
+  // int16_t *Xu = 0;
+  float levdB;
+  float lev;
 
   int slot2 = slot;
   int sample_offset_slot, i, log2_ifft_size = 10;
@@ -470,10 +591,11 @@ int detect_nr_prach_f(PHY_VARS_gNB *gNB,
   uint16_t N_ZC             = (prach_sequence_length==0)?839:139;
   int reps, Ncp, dftlen, mu = fp->numerology_index;
 
-  int16_t **rxsigF = gNB->prach_rxsigF_i[fd_occasion];
-  int32_t *prach_ifft = (int32_t*)NULL;
-  int16_t *prach[nb_rx];
-  int16_t prach_ifft_tmp[2048*2] __attribute__((aligned(32)));
+  float **rxsigF = gNB->prach_rxsigF_f[fd_occasion];
+  float *prach_ifft = (float*)NULL;
+  float *prach[nb_rx];
+  float prach_ifft_tmp[2048*2] __attribute__((aligned(32)));
+  float *prachF = NULL;
 
   if (prachStartSymbol == 0) {
     sample_offset_slot = 0;
@@ -489,17 +611,12 @@ int detect_nr_prach_f(PHY_VARS_gNB *gNB,
       sample_offset_slot = (fp->ofdm_symbol_size + fp->nb_prefix_samples) * prachStartSymbol;
   }
 #ifdef NR_PRACH_DEBUG
-  printf("In slot %d: doing rx_nr_prach_ru for format %d, numRA %d, prachStartSymbol %d, fd_occasion %d\n",slot,prachFormat,numRA,prachStartSymbol,fd_occasion);
+  printf("In slot %d: doing rx_nr_prach_ru for format %d, prachStartSymbol %d, fd_occasion %d\n",slot,prachFormat,prachStartSymbol,fd_occasion);
 #endif
-
-  compute_nr_prach_seq(gNB->prach_config.prach_sequence_length,
-                       gNB->prach_config.num_prach_fd_occasions_list[fd_occasion].num_root_sequences,
-                       gNB->prach_config.num_prach_fd_occasions_list[fd_occasion].prach_root_sequence_index,
-                       gNB->X_u);
 
   for (int aa=0; aa<fp->nb_antennas_rx; aa++){ 
     if (prach_sequence_length == 0) slot2=(slot/fp->slots_per_subframe)*fp->slots_per_subframe; 
-    prach[aa] = (int16_t*)&gNB->rxdata[aa][fp->get_samples_slot_timestamp(slot2,fp,0)+sample_offset_slot-gNB->N_TA_offset];
+    prach[aa] = &gNB->rxdata_float[aa][2*fp->get_samples_slot_timestamp(slot2,fp,0)+sample_offset_slot-gNB->N_TA_offset];
   } 
 
   if (prach_sequence_length == 0) {
@@ -652,8 +769,6 @@ int detect_nr_prach_f(PHY_VARS_gNB *gNB,
     AssertFatal(1==0,"sample rate %f MHz not supported for numerology %d\n", fp->samples_per_subframe / 1000.0, mu);
   }
 
-  const dft_size_idx_t dftsize = get_dft(dftlen);
-
   // Do forward transform
   #ifdef NR_PRACH_DEBUG
     printf("rx_prach: Doing PRACH FFT for nb_rx:%d Ncp:%d dftlen:%d\n", fp->nb_antennas_rx, Ncp, dftlen);
@@ -692,18 +807,17 @@ int detect_nr_prach_f(PHY_VARS_gNB *gNB,
     }
 
     // do DFT
-    int16_t *prach2 = prach[aa] + (2*Ncp); // times 2 for complex samples
+    float *prach2 = prach[aa] + (2*Ncp); // times 2 for complex samples
     for (int i = 0; i < reps; i++)
-      dft_oai(dftsize, prach2 + 2*dftlen*i, rxsigF[aa] + 2*dftlen*i, 1);
+      dft_fftw3(dftlen, prach2 + 2*dftlen*i, rxsigF[aa] + 2*dftlen*i);
 
 #ifdef NR_PRACH_DEBUG
     // Coherent combining of PRACH repetitions (assumes channel does not change, to be revisted for "long" PRACH)
     printf("Doing PRACH combining of %d reptitions N_ZC %d\n",reps,N_ZC);
 #endif
-    int16_t rxsigF_tmp[N_ZC<<1];
-    //    if (k+N_ZC > dftlen) { // PRACH signal is split around DC 
-    int16_t *rxsigF2=rxsigF[aa];
-    int k2=k<<1;
+    float rxsigF_tmp[N_ZC << 1];
+    float *rxsigF2 = rxsigF[aa];
+    int k2 = k << 1;
 
     for (int j=0;j<N_ZC<<1;j++,k2++) {
       if (k2==(dftlen<<1)) k2=0;
@@ -712,16 +826,15 @@ int detect_nr_prach_f(PHY_VARS_gNB *gNB,
     }
     memcpy((void*)rxsigF2,(void *)rxsigF_tmp,N_ZC<<2);
   }
-    // rxsigF[aa] = &rxsigF[aa][2048*2*2];
-    LOG_M("ru_rxsigF_tmp.m","rxsFtmp", rxsigF[aa], dftlen*2*reps, 1, 1);
+  // LOG_M("ru_rxsigF_tmp_float.m","rxsFtmp", rxsigF[aa], dftlen*2*reps, 1, 13);
 
   #ifdef NR_PRACH_DEBUG
-    printf("L1 PRACH RX: rooSequenceIndex %d, numRootSeqeuences %d, NCS %d, N_ZC %d, format %d \n",rootSequenceIndex,numrootSequenceIndex,NCS,N_ZC,prachFormat);
-    printf("PRACH (gNB) : running rx_prach for slot %d, msg1_frequencystart %d, rootSequenceIndex %d\n", slot, msg1_frequencystart,rootSequenceIndex);
+    printf("L1 PRACH RX: rooSequenceIndex %d, numRootSeqeuences %d, NCS %d, N_ZC %d, format %d \n", gNB->prach_config.num_prach_fd_occasions_list[fd_occasion].prach_root_sequence_index,gNB->prach_config.num_prach_fd_occasions_list[fd_occasion].num_root_sequences,NCS,N_ZC,prachFormat);
+    printf("PRACH (gNB) : running rx_prach for slot %d, msg1_frequencystart %d\n", slot, msg1_frequencystart);
   #endif
 
-  prach_ifft        = (int32_t *)malloc(sizeof(int32_t)*2048);
-  prachF            = (int16_t *)malloc(sizeof(int32_t)*2048);
+  prach_ifft        = (float *)malloc(sizeof(float)*2048);
+  prachF            = (float *)malloc(sizeof(float)*2048);
 
   // PDP is oversampled, e.g. 1024 sample instead of 839
   // Adapt the NCS (zero-correlation zones) with oversampling factor e.g. 1024/839
@@ -769,60 +882,53 @@ int detect_nr_prach_f(PHY_VARS_gNB *gNB,
     if (new_dft == 1) {
       new_dft = 0;
 
-      Xu=(int16_t*)gNB->X_u[preamble_offset-first_nonzero_root_idx];
+      Xu = gNB->X_u_float[preamble_offset-first_nonzero_root_idx];
+      // Xu=(int16_t*)gNB->X_u[preamble_offset-first_nonzero_root_idx];
 
       #ifdef NR_PRACH_DEBUG
         printf("PRACH RX new dft preamble_offset-first_nonzero_root_idx %d\n",preamble_offset-first_nonzero_root_idx);
       #endif
 
-      memset(prach_ifft,0,((N_ZC==839) ? 2048 : 256)*sizeof(int32_t));
+      memset(prach_ifft,0,((N_ZC==839) ? 2048 : 256)*sizeof(float));
     
 
-      memset(prachF, 0, sizeof(int16_t)*2*1024 );
+      memset(prachF, 0, sizeof(float)*2*1024);
       // if (LOG_DUMPFLAG(PRACH)) {      
-	      //  LOG_M("prach_rxF0.m","prach_rxF0",rxsigF[0],N_ZC,1,1);
+	      //  LOG_M("prach_rxF0_float.m","prach_rxF0",rxsigF[0],N_ZC,1,13);
 	    //    LOG_M("prach_rxF1.m","prach_rxF1",rxsigF[1],6144,1,1);
       // }
    
       for (aa=0;aa<nb_rx; aa++) {
 	  // Do componentwise product with Xu* on each antenna 
 
-	       for (offset=0; offset<(N_ZC<<1); offset+=2) {
-	          prachF[offset]   = (int16_t)(((int32_t)Xu[offset]*rxsigF[aa][offset]   + (int32_t)Xu[offset+1]*rxsigF[aa][offset+1])>>15);
-	          prachF[offset+1] = (int16_t)(((int32_t)Xu[offset]*rxsigF[aa][offset+1] - (int32_t)Xu[offset+1]*rxsigF[aa][offset])>>15);
+         	for (offset=0; offset<(N_ZC<<1); offset+=2) {
+            // prachF[offset]   = (Xu[offset]/32767.0)*rxsigF[aa][offset]   + (Xu[offset+1]/32767.0)*rxsigF[aa][offset+1];
+	          // prachF[offset+1] = (Xu[offset]/32767.0)*rxsigF[aa][offset+1] - (Xu[offset+1]/32767.0)*rxsigF[aa][offset];
+	          prachF[offset]   = Xu[offset]*rxsigF[aa][offset]   + Xu[offset+1]*rxsigF[aa][offset+1];
+	          prachF[offset+1] = Xu[offset]*rxsigF[aa][offset+1] - Xu[offset+1]*rxsigF[aa][offset];
+            // printf("%f + %f\n", prachF[offset], prachF[offset+1]);
 	       }
-	
+
 	       // Now do IFFT of size 1024 (N_ZC=839) or 256 (N_ZC=139)
 	       if (N_ZC == 839) {
-	         idft_oai(IDFT_1024,prachF,prach_ifft_tmp,1);
+	         idft_fftw3(1024,prachF,prach_ifft_tmp);
 	         // compute energy and accumulate over receive antennas
 	         for (i=0;i<1024;i++)
-	           prach_ifft[i] += (int32_t)prach_ifft_tmp[i<<1]*(int32_t)prach_ifft_tmp[i<<1] + (int32_t)prach_ifft_tmp[1+(i<<1)]*(int32_t)prach_ifft_tmp[1+(i<<1)];
+	           prach_ifft[i] += prach_ifft_tmp[i<<1]*prach_ifft_tmp[i<<1] + prach_ifft_tmp[1+(i<<1)]*prach_ifft_tmp[1+(i<<1)];
 	       } else {
-	         idft_oai(IDFT_256,prachF,prach_ifft_tmp,1);
+	         idft_fftw3(256,prachF,prach_ifft_tmp);
 	         log2_ifft_size = 8;
            // compute energy and accumulate over receive antennas and repetitions for BR
            for (i=0;i<256;i++)
-             prach_ifft[i] += (int32_t)prach_ifft_tmp[i<<1]*(int32_t)prach_ifft_tmp[(i<<1)] + (int32_t)prach_ifft_tmp[1+(i<<1)]*(int32_t)prach_ifft_tmp[1+(i<<1)];
+             prach_ifft[i] += prach_ifft_tmp[i<<1]*prach_ifft_tmp[(i<<1)] + prach_ifft_tmp[1+(i<<1)]*prach_ifft_tmp[1+(i<<1)];
          }
 
         // if (0) {
-        //   if (aa==0) LOG_M("prach_rxF_comp0.m","prach_rxF_comp0",prachF,1024,1,1);
+          // LOG_M("prach_rxF_comp0_float.m","prach_rxF_comp0",prachF,1024,1,13);
         //   if (aa==1) LOG_M("prach_rxF_comp1.m","prach_rxF_comp1",prachF,1024,1,1);
         // }
 
       }// antennas_rx
-
-      // Normalization of energy over ifft and receive antennas
-      if (N_ZC == 839) {
-        log2_ifft_size = 10;
-        for (i=0;i<1024;i++)
-          prach_ifft[i] = (prach_ifft[i]>>log2_ifft_size)/nb_rx;
-      } else {
-        log2_ifft_size = 8;
-        for (i=0;i<256;i++)
-          prach_ifft[i] = (prach_ifft[i]>>log2_ifft_size)/nb_rx;
-      }
 
     } // new dft
     
@@ -831,14 +937,16 @@ int detect_nr_prach_f(PHY_VARS_gNB *gNB,
     preamble_shift2 = ((preamble_shift==0) ? 0 : ((preamble_shift<<log2_ifft_size)/N_ZC));
 
     for (i=0; i<NCS2; i++) {
-      lev = (int32_t)prach_ifft[(preamble_shift2+i)];
-      levdB = dB_fixed_times10(lev);
+      // lev = (int32_t)prach_ifft[(preamble_shift2+i)];
+      // levdB = dB_fixed_times10(lev);
+      lev = prach_ifft[(preamble_shift2+i)];
+      levdB = 10.0*10.0*log10f(lev);
 
       if (levdB>*max_preamble_energy) {
-        // #ifdef NR_PRACH_DEBUG
-  	      // printf("preamble_index %d, delay %d en %d dB > %d dB\n",preamble_index,i,levdB,*max_preamble_energy);
-        // #endif
-	      *max_preamble_energy  = levdB;
+        #ifdef NR_PRACH_DEBUG
+  	      printf("preamble_index %d, delay %d en %f dB > %d dB\n",preamble_index,i,levdB,*max_preamble_energy);
+        #endif
+	      *max_preamble_energy  = (uint16_t)levdB;
 	      *max_preamble_delay   = i; // Note: This has to be normalized to the 30.72 Ms/s sampling rate 
 	      *max_preamble         = preamble_index;
       }

@@ -8965,7 +8965,7 @@ void dft_oai(uint8_t sizeidx, int16_t *input,int16_t *output,unsigned char scale
           algn=0x1F;
         AssertFatal(((intptr_t)output&algn)==0,"Buffers should be aligned %p",output);
         if (((intptr_t)input)&algn) {
-          printf("DFT called with input not aligned, add a memcpy, size %d\n", sizeidx);
+          // printf("DFT called with input not aligned, add a memcpy, size %d\n", sizeidx);
           int sz=dft_ftab[sizeidx].size;
           if (sizeidx==DFT_12) // This case does 8 DFTs in //
             sz*=8;
@@ -8982,7 +8982,7 @@ void idft_oai(uint8_t sizeidx, int16_t *input,int16_t *output,unsigned char scal
 	algn=0x1F;
         AssertFatal( ((intptr_t)output&algn)==0,"Buffers should be 16 bytes aligned %p",output);
         if (((intptr_t)input)&algn ) {  
-          printf("DFT called with input not aligned, add a memcpy\n");
+          // printf("DFT called with input not aligned, add a memcpy\n");
           int sz=idft_ftab[sizeidx].size;
           int16_t tmp[sz*2] __attribute__ ((aligned(32))); // input and output are not in right type (int16_t instead of c16_t)
           memcpy(tmp, input, sizeof tmp);

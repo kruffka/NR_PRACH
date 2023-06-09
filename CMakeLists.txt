@@ -42,4 +42,4 @@ add_executable(nr_prach ${SRC}/nr_prach.c
                         )
 
 
-target_link_libraries(nr_prach oai_dfts m fftw3_dfts fftw3)
+target_link_libraries(nr_prach oai_dfts m fftw3_dfts fftw3f)

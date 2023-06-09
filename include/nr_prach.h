@@ -71,30 +71,16 @@ typedef struct NR_FRAME_PARMS NR_FRAME_PARMS;
 typedef uint32_t (*get_samples_per_slot_t)(int slot, NR_FRAME_PARMS* fp);
 typedef uint32_t (*get_samples_slot_timestamp_t)(int slot, NR_FRAME_PARMS* fp, uint8_t sl_ahead);
 struct NR_FRAME_PARMS {
-  /// Number of resource blocks (RB) in DL
-  int N_RB_DL;
   /// Number of resource blocks (RB) in UL
   int N_RB_UL;
-  /// Cell ID
-  uint16_t Nid_cell;
-  /// subcarrier spacing (15,30,60,120)
-  uint32_t subcarrier_spacing;
-  /// 3/4 sampling
-  uint8_t threequarter_fs;
   /// Size of FFT
   uint16_t ofdm_symbol_size;
   /// Number of prefix samples in all but first symbol of slot
   uint16_t nb_prefix_samples;
   /// Number of prefix samples in first symbol of slot
   uint16_t nb_prefix_samples0;
-  /// Carrier offset in FFT buffer for first RE in PRB0
-  uint16_t first_carrier_offset;
-  /// Number of OFDM/SC-FDMA symbols in one slot
-  uint16_t symbols_per_slot;
   /// Number of slots per subframe
   uint16_t slots_per_subframe;
-  /// Number of slots per frame
-  uint16_t slots_per_frame;
   /// Number of samples in a subframe
   uint32_t samples_per_subframe;
   /// Number of samples in 0th and center slot of a subframe
@@ -103,20 +89,10 @@ struct NR_FRAME_PARMS {
   uint32_t samples_per_slotN0;
   /// Number of samples in a radio frame
   uint32_t samples_per_frame;
-  /// Number of samples in a subframe without CP
-  uint32_t samples_per_subframe_wCP;
-  /// Number of samples in a slot without CP
-  uint32_t samples_per_slot_wCP;
-  /// Number of samples in a radio frame without CP
-  uint32_t samples_per_frame_wCP;
-  /// NR numerology index [0..5] as specified in 38.211 Section 4 (mu). 0=15khZ SCS, 1=30khZ, 2=60kHz, etc
+  /// NR numerology index [0..7] as specified in 38.211 Section 4 (mu). 0=15khZ SCS, 1=30khZ, 2=60kHz, etc
   uint8_t numerology_index;
-  /// Number of Physical transmit antennas in node (corresponds to nrOfAntennaPorts)
-  uint8_t nb_antennas_tx;
   /// Number of Receive antennas in node
   uint8_t nb_antennas_rx;
-  /// Number of common transmit antenna ports in eNodeB (1 or 2)
-  uint8_t nb_antenna_ports_gNB;
   /// Number of samples in current slot
   get_samples_per_slot_t get_samples_per_slot;
   /// Number of samples before slot
@@ -177,13 +153,6 @@ typedef struct PHY_VARS_NR_UE {
 
 } PHY_VARS_NR_UE;
 
-int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, int slot, int preamble_index, uint8_t fd_occasion);
-void init_nr_prach_tables(int N_ZC);
-void compute_nr_prach_seq(uint8_t short_sequence,
-                          uint8_t num_sequences,
-                          uint8_t rootSequenceIndex,
-                          uint32_t X_u[64][839]);
-
 // gNB TYPES
 #define NUMBER_OF_NR_PRACH_OCCASIONS_MAX 1 // 12
 typedef struct PHY_VARS_gNB {
@@ -192,26 +161,43 @@ typedef struct PHY_VARS_gNB {
     fapi_nr_prach_config_t prach_config;
     fapi_nr_prach_pdu_t prach_pdu;
     uint32_t X_u[64][839];
-    int32_t **rxdata;
+    float X_u_float[64][839*2];
+    int32_t **rxdata_int;
+    float **rxdata_float;
     int N_TA_offset;
     int16_t **prach_rxsigF_i[NUMBER_OF_NR_PRACH_OCCASIONS_MAX];
     float **prach_rxsigF_f[NUMBER_OF_NR_PRACH_OCCASIONS_MAX];
 
 } PHY_VARS_gNB;
 
-int detect_nr_prach_i(PHY_VARS_gNB *gNB,
-                    int slot,
-                    int fd_occasion,
-                    uint16_t *max_preamble,
-                    uint16_t *max_preamble_energy,
-                    uint16_t *max_preamble_delay);
+void compute_nr_prach_seq(uint8_t short_sequence,
+                          uint8_t num_sequences,
+                          uint8_t rootSequenceIndex,
+                          uint32_t X_u[64][839]);
 
-int detect_nr_prach_i(PHY_VARS_gNB *gNB,
-                    int slot,
-                    int fd_occasion,
-                    uint16_t *max_preamble,
-                    uint16_t *max_preamble_energy,
-                    uint16_t *max_preamble_delay);
+void compute_nr_prach_seq_float(uint8_t short_sequence,
+                                uint8_t num_sequences,
+                                uint8_t rootSequenceIndex,
+                                float X_u[64][839*2]);
+
+// UE
+int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, int slot, int preamble_index, uint8_t fd_occasion);
+void init_nr_prach_tables(int N_ZC);
+
+// gNB
+int detect_nr_prach_int(PHY_VARS_gNB *gNB,
+                        int slot,
+                        int fd_occasion,
+                        uint16_t *max_preamble,
+                        uint16_t *max_preamble_energy,
+                        uint16_t *max_preamble_delay);
+
+int detect_nr_prach_float(PHY_VARS_gNB *gNB,
+                          int slot,
+                          int fd_occasion,
+                          uint16_t *max_preamble,
+                          uint16_t *max_preamble_energy,
+                          uint16_t *max_preamble_delay);
 
 
 #endif // __NR_PRACH_H__

@@ -20,9 +20,9 @@ int write_file_matlab(const char *fname,
 
   //printf("Writing %d elements of type %d to %s\n",length,format,fname);
 
-  if (format == 10 || format ==11 || format == 12 || format == 13 || format == 14 || multiVec) {
+  if (format == 10 || format ==11 || format == 12 || format == 14 || multiVec) {
     fp = fopen(fname,"a+");
-  } else if (format != 10 && format !=11  && format != 12 && format != 13 && format != 14) {
+  } else if (format != 10 && format !=11  && format != 12 && format != 14) {
     fp = fopen(fname,"w+");
   }
 
@@ -68,7 +68,6 @@ int write_file_matlab(const char *fname,
       break;
 
     case 1:  // complex 16-bit
-    case 13:
     case 14:
     case 15:
       for (i=0; i<length<<1; i+=(2*dec)) {
@@ -160,6 +159,14 @@ int write_file_matlab(const char *fname,
 
     case 12 : // case eren for log2_maxh real unsigned 8 bit
       fprintf(fp,"%d \n",((unsigned char *)&data)[0]);
+      break;
+
+    case 13:
+      // complex float
+      for (i=0; i<length<<1; i+=(2*dec)) {
+        fprintf(fp,"%f + j*(%f)\n",((float *)data)[i],((float *)data)[i+1]);
+      }
+
       break;
   default:
     AssertFatal(1 == 0, "unknown dump format: %u\n", format);

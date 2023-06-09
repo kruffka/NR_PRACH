@@ -1,0 +1,12 @@
+- clang
+- memory check valgrind
+- cmake
+- float complex insted of float
+- two preambles in slot
+- freq offset
+- time delay
+- input args
+
+Maybe one day:
+- Add check of input params
+- Add prach ocassions not only one
