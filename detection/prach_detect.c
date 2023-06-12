@@ -5,7 +5,7 @@
 
 const char *prachfmt[]={"0","1","2","3", "A1","A2","A3","B1","B4","C0","C2","A1/B1","A2/B2","A3/B3"};
 
-#define NR_PRACH_DEBUG
+// #define NR_PRACH_DEBUG
 uint32_t nr_ZC_inv[839];
 
 static float nr_ru[2*839];
@@ -930,6 +930,17 @@ int detect_nr_prach_float(PHY_VARS_gNB *gNB,
 
       }// antennas_rx
 
+      // Normalization of energy over ifft and receive antennas
+      // if (N_ZC == 839) {
+      //   log2_ifft_size = 10;
+      //   for (i=0;i<1024;i++)
+      //     prach_ifft[i] = (prach_ifft[i]/(1<<log2_ifft_size))/nb_rx;
+      // } else {
+      //   log2_ifft_size = 8;
+      //   for (i=0;i<256;i++)
+      //     prach_ifft[i] = (prach_ifft[i]/(1<<log2_ifft_size))/nb_rx;
+      // }
+    
     } // new dft
     
     // check energy in nth time shift, for 
@@ -949,6 +960,12 @@ int detect_nr_prach_float(PHY_VARS_gNB *gNB,
 	      *max_preamble_energy  = (uint16_t)levdB;
 	      *max_preamble_delay   = i; // Note: This has to be normalized to the 30.72 Ms/s sampling rate 
 	      *max_preamble         = preamble_index;
+              // if (levdB > 500) {
+                                // preamble_index = 64;
+
+              //   break;
+              // }
+
       }
     }
   }// preamble_index
@@ -968,7 +985,7 @@ int detect_nr_prach_float(PHY_VARS_gNB *gNB,
   // Format >3: 2048/2^mu samples @ 30.72 Ms/s, 2048/2^mu * 4 samples @ 122.88 Ms/s
   // By solving:
   // max_preamble_delay * ( (2048/2^mu*(fs/30.72M)) / 256 ) / fs = TA * 16 * 64 / 2^mu * Tc
-#ifdef NR_PRACH_DEBUG
+// #ifdef NR_PRACH_DEBUG
   uint16_t *TA = max_preamble_delay;
   mu = fp->numerology_index;
   if (gNB->prach_config.prach_sequence_length) {
@@ -977,8 +994,8 @@ int detect_nr_prach_float(PHY_VARS_gNB *gNB,
   }
   else *TA = *TA/2;
 
-  printf("Delay %d\n", *TA);
-#endif
+  printf("Delay %d ns %f %d\n", *TA, ((float)*max_preamble_delay)/(2.0f/(1024.0f * 1000.0f * 10.0f)) *1000000000.0f, *max_preamble_delay);
+// #endif
 
   free(prach_ifft);
   free(prachF);

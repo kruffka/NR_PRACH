@@ -6,6 +6,7 @@
 - freq offset
 - time delay
 - input args
+- remove 307200 hardcode
 
 Maybe one day:
 - Add check of input params
