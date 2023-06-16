@@ -1,13 +1,12 @@
 - clang
 - memory check valgrind
-- cmake
+- cmake revisit
 - float complex insted of float
-- two preambles in slot
-- freq offset
-- time delay
 - input args
 - remove 307200 hardcode
 
 Maybe one day:
 - Add check of input params
-- Add prach ocassions not only one
+- Add prach ocassions
+- Add full configuration from prachConfig
+- two preambles in slot?

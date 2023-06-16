@@ -3,41 +3,33 @@
 #include <time.h>
 #include "nr_prach.h"
 
-#define RAND_BUFSIZE 512
-int randn(double *x, int n, double mu, double sigma) 
-{ 
-    int k, m; 
-    double x1[RAND_BUFSIZE], x2[RAND_BUFSIZE]; 
-    int res = 0; 
-    if (!x) { 
-        return -1; 
-    } 
+double randn (double mu, double sigma)
+{
+  double U1, U2, W, mult;
+  static double X1, X2;
+  static int call = 0;
  
-    if (n < 1) { 
-        return -1; 
-    } 
+  if (call == 1)
+    {
+      call = !call;
+      return (mu + sigma * (double) X2);
+    }
  
-    if (sigma < 0.0) { 
-        return -1; 
-    } 
+  do
+    {
+      U1 = -1 + ((double) rand () / RAND_MAX) * 2;
+      U2 = -1 + ((double) rand () / RAND_MAX) * 2;
+      W = pow (U1, 2) + pow (U2, 2);
+    }
+  while (W >= 1 || W == 0);
  
-    k = 0; 
-    while (k < n) { 
-
-        m = 0; 
-        while (k < n && m < RAND_BUFSIZE) { 
-            if (x1[m] != 0.0) { 
-                x[k] = sqrt(-2.0 * log(x1[m])) * cos(2*M_PI * x2[m]) * sigma + mu; 
-                k++; 
-                m++; 
-            } else { 
-                x1[m] = (double)rand() / RAND_MAX; 
-            } 
-        } 
-    } 
+  mult = sqrt ((-2 * log (W)) / W);
+  X1 = U1 * mult;
+  X2 = U2 * mult;
  
-
-    return res; 
+  call = !call;
+ 
+  return (mu + sigma * (double) X1);
 }
 
 // #define MAIN_DEBUG
@@ -126,7 +118,12 @@ void init_nr_signal(PHY_VARS_NR_UE *ue, PHY_VARS_gNB *gNB, init_params_t *config
   ue->prach_config = gNB->prach_config = config->prach_config;
   ue->prach_pdu = gNB->prach_pdu = config->prach_pdu;
 
-  
+
+  compute_nr_prach_seq(ue->prach_config.prach_sequence_length,
+                       ue->prach_config.num_prach_fd_occasions_list[0].num_root_sequences,
+                       ue->prach_config.num_prach_fd_occasions_list[0].prach_root_sequence_index,
+                       ue->X_u);
+
   compute_nr_prach_seq(gNB->prach_config.prach_sequence_length,
                              gNB->prach_config.num_prach_fd_occasions_list[0].num_root_sequences,
                              gNB->prach_config.num_prach_fd_occasions_list[0].prach_root_sequence_index,
@@ -166,9 +163,7 @@ void deinit_nr_signal(PHY_VARS_NR_UE *ue, PHY_VARS_gNB *gNB) {
 
 void freq_shift(void *input, void *output, int size, int freq_shift_Hz) {
         
-        double off_angle = -2*M_PI*s_time*freq_shift_Hz;   // offset rotation angle compensation per sample
-
-        off_angle *= -1;
+        double off_angle = 2*M_PI*s_time*freq_shift_Hz;   // offset rotation angle compensation per sample
 
         // loop over samples
         int re, im;
@@ -182,6 +177,8 @@ void freq_shift(void *input, void *output, int size, int freq_shift_Hz) {
 
 void noise_randn(void *input, void *output, int start, int end, int size, float SNR_dB) {
 
+        int nb_rx = 1;
+
         float re, im;
         double power_tot = 0.0;
         double power_avg = 0.0;
@@ -190,33 +187,23 @@ void noise_randn(void *input, void *output, int start, int end, int size, float 
           im = ((double)(((short *)input))[2*n+1]);
           power_tot += re*re + im*im;
         }
-        int nb_rx = 1;
         
-        // SNR_dB = SNR_dB - 20;//10*log10(2048); //10*log10(2048);
-// int tx_lev = 10;
-        power_avg = power_tot / (end-start); // todo remove hardcode
-        float scalingFactor = 1.0/sqrtf((2.0*nb_rx*2048*powf(10.0, SNR_dB / 10.0)))*32767;
-        // scalingFactor = 30000;
-                  // double sigma2_dB = 10*log10((double)tx_lev) - SNR_dB - 10*log10(106*12/839);
-            // printf("sigma2_dB %f (SNR %f dB) tx_lev_dB %f\n",sigma2_dB,SNR_dB,10*log10((double)tx_lev));
-          //AWGN
-          // double sigma2 = pow(10,sigma2_dB/10);
-        // float SNR = powf(10.0, SNR_dB/10.0);
-        // float scalingFactor = 1.0/sqrtf(2.0*1*2048*SNR)*power_avg;
-        double complex noise[size];
-          printf("%f %f\n", power_avg, scalingFactor);
+        power_avg = power_tot / (end-start) / nb_rx;
 
-        int ret = randn(noise, size, 0.0, 1.0);
+        float scalingFactor = 1.0/sqrtf((2.0*nb_rx*2048*powf(10.0, SNR_dB / 10.0)))*2*power_avg; // *32767? *2*power_avg? for int
+
+        // printf("%f\n", scalingFactor);
+
         for (int n = 0; n < size; n++) {
-          re = (float)rand() / RAND_MAX;
-          im = (float)rand() / RAND_MAX;
-          // re = creal(noise[n]);
-          // im = cimag(noise[n]);
-          // if (n < 5)
-          // ((short *)output)[2*n] = (short)(((short *)input)[2*n] + (short)scalingFactor*creal(noise[n]));
-          // ((short *)output)[2*n + 1] = (short)(((short *)input)[2*n + 1] + (short)scalingFactor*cimag(noise[n]));
+
+          re = randn(0.0, 1.0);
+          im = randn(0.0, 1.0);
+          // if (n < 5) {
+          //   printf("%f\n", re);
+          // }
+
           ((short *)output)[2*n] = (short)(((short *)input)[2*n] + re*scalingFactor);
-          ((short *)output)[2*n + 1] = (short)(((short *)input)[2*n + 1]+ im*scalingFactor);
+          ((short *)output)[2*n + 1] = (short)(((short *)input)[2*n + 1] + im*scalingFactor);
         }
         
 }
@@ -240,7 +227,7 @@ void time_delay_in_samples(void *input, void *output, int size, int delay_sample
 
 int main(int argc, char *argv[]) {
 
-    if (argc < 3) {
+    if (argc < 2) {
       printf("Usage: ./nr_prach is_float\n");
       exit(0);
     }
@@ -265,8 +252,8 @@ int main(int argc, char *argv[]) {
     uint16_t max_preamble;
     uint16_t max_preamble_energy;
     uint16_t max_preamble_delay;
-    int slot = 0;
-    int fd_occasion = 0;
+    int slot = 1;
+    int fd_occasion = 0; // only 0 for now..
     int success = 0;
     gNB.N_TA_offset = 0;
 
@@ -306,36 +293,50 @@ int main(int argc, char *argv[]) {
       },
     };
 
+    int Monte_Carlo = 1, 
+        freq_shift_start = 0,
+        freq_shift_step = 1, // 50 kHz
+        freq_shift_end = 0,//1200e3, // 1.2 MHz
+        delay_start = 0, // in samples
+        delay_step = 1,
+        delay_end = 0;
+    float SNR_start = 25.0, 
+          SNR_step = 1,
+          SNR_end = 25.0;
+
+    if (SNR_step == 0 || delay_step == 0 || freq_shift_step == 0) {
+      printf("Step can't be 0!\n");
+      exit(0);
+    }
+
 
     init_nr_signal(&ue, &gNB, &frame_and_prach_config);
+
     int32_t **txdata_ue = &ue.txdata[0];
     int32_t **rxdata_gNB = &gNB.rxdata_int[0];
 
     if (nof_preambles > 64 || nof_preambles < 0) 
       AssertFatal(1 == 0, "Error, nof preamble idx only 0..63; nof_preambles %d\n", nof_preambles);
 
-    int Monte_Carlo = 1, 
-        freq_shift_start = 10, 
-        freq_shift_step = 5,
-        freq_shift_end = 25, 
-        delay_start = 5, // in samples
-        delay_step = 5,
-        delay_end = 15;
-    float SNR_start = 0.0, 
-          SNR_step = 1,
-          SNR_end = 1.0;
+
 
     printf("Running nof preamble idx %d\n", nof_preambles);
 
-    int size = 61440;
+    int size = ue.frame_parms.samples_per_frame;
+
+    int32_t second_ue_buf[1][size];
     // int32_t 
+    // first 3 for loops (freq, snr, delay) can be in any order
+    for (float SNR_dB = SNR_start; SNR_dB <= SNR_end; SNR_dB += SNR_step) {
+      
+      // printf("detection_%ddb = [", (int)SNR_dB);
 
-    for (int delay = delay_start; delay < delay_end; delay += delay_step) {
-    
-      for (int freq_shift_Hz = freq_shift_start; freq_shift_Hz < freq_shift_end; freq_shift_Hz += freq_shift_step) {
+      for (int freq_shift_Hz = freq_shift_start; freq_shift_Hz <= freq_shift_end; freq_shift_Hz += freq_shift_step) {
 
-        for (float SNR_dB = SNR_start; SNR_dB < SNR_end; SNR_dB += SNR_step) {
-    
+        for (int delay = delay_start; delay <= delay_end; delay += delay_step) {
+
+          success = 0;
+          
           for (int mc = 0; mc < Monte_Carlo; mc++) {
 
           // memset(&ue.txdata[0][0], 0, sizeof(int32_t)*size);
@@ -350,6 +351,27 @@ int main(int argc, char *argv[]) {
             ra_PreambleIndex = rand() % nof_preambles;
             generate_nr_prach(&ue, slot, ra_PreambleIndex, fd_occasion);
 
+
+#if 0       // second UE
+            
+            printf("first UE preamble idx = %d\n", ra_PreambleIndex);
+            memcpy(&second_ue_buf[0][0], &ue.txdata[0][0], sizeof(int32_t)*size);
+            memset(&ue.txdata[0][0], 0, sizeof(int32_t)*size);
+
+            ra_PreambleIndex = rand() % nof_preambles;
+            generate_nr_prach(&ue, slot, ra_PreambleIndex, fd_occasion);
+
+            // signal sum
+            for(int n=0; n<size; n++){
+                ((short *)ue.txdata[0])[2*n] += (((short *)second_ue_buf[0]))[2*n];
+                ((short *)ue.txdata[0])[2*n+1] += (((short *)second_ue_buf[0]))[2*n+1];
+            }
+
+            printf("Second UE preamble idx = %d\n", ra_PreambleIndex);
+
+#endif
+
+
 #ifdef MAIN_DEBUG
           //
           printf("========================== Channel Simulation ==========================\n");
@@ -358,21 +380,11 @@ int main(int argc, char *argv[]) {
               for (int aa = 0; aa < ue.frame_parms.nb_antennas_rx; aa++) {
                 time_delay_in_samples(&txdata_ue[aa][0], &rxdata_gNB[aa][0], size, delay);
                 freq_shift(&rxdata_gNB[aa][0], &rxdata_gNB[aa][0], size, freq_shift_Hz);
-                noise_randn(&rxdata_gNB[aa][0], &rxdata_gNB[aa][0], slot*30720, slot*30720+24576+3184, size, atof(argv[2]));
+                noise_randn(&rxdata_gNB[aa][0], &rxdata_gNB[aa][0], slot*30720, slot*30720+24576+3184, size, SNR_dB);
               }
 
-        // generate_nr_prach(&ue, slot, ra_PreambleIndex, fd_occasion);
 
             // LOG_M("txdata0.m", "txdata", &txdata_ue[0][0], 307200, 1, 1);
-            // for (int aa = 0; aa < ue.frame_parms.nb_antennas_rx; aa++) {
-            //   freq_shift(&txdata_ue[aa][0], &rxdata_gNB[aa][0], 307200, freq_shift_Hz);
-            //   noise_randn(&txdata_ue[aa][0], &rxdata_gNB[aa][0], slot*30720, slot*30720+30720, 307200, SNR_dB);
-            //   time_delay(&txdata_ue[aa][0], &rxdata_gNB[aa][0], 307200, samples_delay);
-            // }
-
-
-            // memcpy(&gNB.rxdata_int[0][0], &ue.txdata[0][0], sizeof(int32_t)*ue.frame_parms.samples_per_frame);
-            // memcpy(&rxdata_gNB[0sd][0], &txdata_ue[0][0], sizeof(int32_t)*ue.frame_parms.samples_per_frame);
 
             // LOG_M("rxdata0.m","rxdata",  &rxdata_gNB[0][0], 307200, 1, 1);
 
@@ -397,7 +409,7 @@ int main(int argc, char *argv[]) {
           printf("========================== Preamble detection ==========================\n");
           //
 #endif
-            max_preamble = 123; // not valid
+            max_preamble = 123; // not valid to check if detection is right
 
             if (gNB_float)
               detect_nr_prach_float(&gNB, slot, fd_occasion, &max_preamble, &max_preamble_energy, &max_preamble_delay);
@@ -406,14 +418,21 @@ int main(int argc, char *argv[]) {
 
             // printf("[%d]\t%d\t%d\t%d\n", mc, SNR_dB, freq_shift_Hz, delay);
             if (max_preamble == ra_PreambleIndex && max_preamble_energy > 0) {
-              printf("SUCCESS!!!\n");
+              // printf("SUCCESS!!!\n");
               success++;
             } else {
-              printf("FAIL!!!\n");
+              // printf("FAIL!!!\n");
             }
           }
+          printf("delay %d samples; SNR = %lf dB; ffo = %d Hz; %d/%d\n", delay, SNR_dB, freq_shift_Hz, success, Monte_Carlo);
+          
+          // printf("%.2f, ", (float)success/Monte_Carlo);
+
         }
+
       }
+      // printf("]\n");
+
     }
     printf("Results: %d/%d\n", success, (Monte_Carlo*(int)((SNR_end-SNR_start)/SNR_step)*(delay_end-delay_start)*(freq_shift_end-freq_shift_start))/delay_step/freq_shift_step);
 

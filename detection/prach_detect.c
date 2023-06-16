@@ -518,9 +518,9 @@ int detect_nr_prach_int(PHY_VARS_gNB *gNB,
       levdB = dB_fixed_times10(lev);
 
       if (levdB>*max_preamble_energy) {
-        // #ifdef NR_PRACH_DEBUG
-  	      // printf("preamble_index %d, delay %d en %d dB > %d dB\n",preamble_index,i,levdB,*max_preamble_energy);
-        // #endif
+        #ifdef NR_PRACH_DEBUG
+  	      printf("preamble_index %d, delay %d en %d dB > %d dB\n",preamble_index,i,levdB,*max_preamble_energy);
+        #endif
 	      *max_preamble_energy  = levdB;
 	      *max_preamble_delay   = i; // Note: This has to be normalized to the 30.72 Ms/s sampling rate 
 	      *max_preamble         = preamble_index;
@@ -960,8 +960,8 @@ int detect_nr_prach_float(PHY_VARS_gNB *gNB,
 	      *max_preamble_energy  = (uint16_t)levdB;
 	      *max_preamble_delay   = i; // Note: This has to be normalized to the 30.72 Ms/s sampling rate 
 	      *max_preamble         = preamble_index;
-              // if (levdB > 500) {
-                                // preamble_index = 64;
+              // if (levdB > 300) {
+              //                   preamble_index = 64;
 
               //   break;
               // }
@@ -985,7 +985,7 @@ int detect_nr_prach_float(PHY_VARS_gNB *gNB,
   // Format >3: 2048/2^mu samples @ 30.72 Ms/s, 2048/2^mu * 4 samples @ 122.88 Ms/s
   // By solving:
   // max_preamble_delay * ( (2048/2^mu*(fs/30.72M)) / 256 ) / fs = TA * 16 * 64 / 2^mu * Tc
-// #ifdef NR_PRACH_DEBUG
+#ifdef NR_PRACH_DEBUG
   uint16_t *TA = max_preamble_delay;
   mu = fp->numerology_index;
   if (gNB->prach_config.prach_sequence_length) {
@@ -995,7 +995,7 @@ int detect_nr_prach_float(PHY_VARS_gNB *gNB,
   else *TA = *TA/2;
 
   printf("Delay %d ns %f %d\n", *TA, ((float)*max_preamble_delay)/(2.0f/(1024.0f * 1000.0f * 10.0f)) *1000000000.0f, *max_preamble_delay);
-// #endif
+#endif
 
   free(prach_ifft);
   free(prachF);

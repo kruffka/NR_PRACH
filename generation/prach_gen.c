@@ -206,10 +206,10 @@ int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, int slot, int ra_PreambleIndex, ui
   printf("Generate NR PRACH in slot %d\n", slot);
 #endif
 
-  compute_nr_prach_seq(prach_config->prach_sequence_length,
-                       prach_config->num_prach_fd_occasions_list[fd_occasion].num_root_sequences,
-                       prach_config->num_prach_fd_occasions_list[fd_occasion].prach_root_sequence_index,
-                       ue->X_u);
+  // compute_nr_prach_seq(prach_config->prach_sequence_length,
+  //                      prach_config->num_prach_fd_occasions_list[fd_occasion].num_root_sequences,
+  //                      prach_config->num_prach_fd_occasions_list[fd_occasion].prach_root_sequence_index,
+  //                      ue->X_u);
 
   if (prachStartSymbol == 0) {
     sample_offset_slot = 0;
