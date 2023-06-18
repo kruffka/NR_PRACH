@@ -93,10 +93,15 @@ struct NR_FRAME_PARMS {
   uint8_t numerology_index;
   /// Number of Receive antennas in node
   uint8_t nb_antennas_rx;
+  /// Cyclic prefix: 0 - normal, 1 - extended
+  uint8_t Ncp;
+  /// Number symbols per slot
+  uint8_t symbols_per_slot;
   /// Number of samples in current slot
   get_samples_per_slot_t get_samples_per_slot;
   /// Number of samples before slot
   get_samples_slot_timestamp_t get_samples_slot_timestamp;
+
 };
 
 // fapi L1 <===> L2

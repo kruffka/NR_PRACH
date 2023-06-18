@@ -62,6 +62,28 @@ uint32_t get_samples_slot_timestamp(int slot, NR_FRAME_PARMS *fp, uint8_t sl_ahe
   return samp_count;
 }
 
+void nr_init_frame_parms_ue_sa(NR_FRAME_PARMS *frame_parms, uint8_t mu) {
+
+  printf("SA init parameters. Numerology %d N_RB_UL %d\n",
+        mu,
+        frame_parms->N_RB_UL);
+
+  frame_parms->numerology_index = mu;
+  frame_parms->nb_prefix_samples    = frame_parms->ofdm_symbol_size / 128 * 9;
+  frame_parms->nb_prefix_samples0   = frame_parms->ofdm_symbol_size / 128 * (9 + (1 << mu));
+  frame_parms->symbols_per_slot = ((frame_parms->Ncp == 0) ? 14 : 12); // to redefine for different slot formats
+  frame_parms->samples_per_slotN0 = (frame_parms->nb_prefix_samples + frame_parms->ofdm_symbol_size) * frame_parms->symbols_per_slot;
+  frame_parms->samples_per_slot0 = frame_parms->nb_prefix_samples0 + ((frame_parms->symbols_per_slot-1)*frame_parms->nb_prefix_samples) + (frame_parms->symbols_per_slot*frame_parms->ofdm_symbol_size);
+  frame_parms->samples_per_subframe = (frame_parms->nb_prefix_samples0 + frame_parms->ofdm_symbol_size) * 2 +
+                             (frame_parms->nb_prefix_samples + frame_parms->ofdm_symbol_size) * (frame_parms->symbols_per_slot * frame_parms->slots_per_subframe - 2);
+  frame_parms->get_samples_per_slot = &get_samples_per_slot;
+  frame_parms->get_samples_slot_timestamp = &get_samples_slot_timestamp;
+  frame_parms->samples_per_frame = 10 * frame_parms->samples_per_subframe;
+
+  printf("samples_per_subframe %d/per second %d\n", frame_parms->samples_per_subframe, 1000*frame_parms->samples_per_subframe);
+
+}
+
 void init_nr_signal(PHY_VARS_NR_UE *ue, PHY_VARS_gNB *gNB, init_params_t *config) {
 
   int nb_rx = config->frame_parms.nb_antennas_rx;
@@ -86,9 +108,9 @@ void init_nr_signal(PHY_VARS_NR_UE *ue, PHY_VARS_gNB *gNB, init_params_t *config
   }
 
   for (int aa = 0; aa < nb_rx; aa++) {
-    ue->txdata[aa] = (int32_t *)malloc16_clear(307200*sizeof(int32_t)); 
-    gNB->rxdata_int[aa] = (int32_t *)malloc16_clear(307200*sizeof(int32_t));
-    gNB->rxdata_float[aa] = (float *)malloc16_clear(307200*sizeof(float));
+    ue->txdata[aa] = (int32_t *)malloc16_clear(config->frame_parms.samples_per_frame*sizeof(int32_t)); 
+    gNB->rxdata_int[aa] = (int32_t *)malloc16_clear(config->frame_parms.samples_per_frame*sizeof(int32_t));
+    gNB->rxdata_float[aa] = (float *)malloc16_clear(config->frame_parms.samples_per_frame*sizeof(float));
   }
 
   for (int occ = 0; occ < NUMBER_OF_NR_PRACH_OCCASIONS_MAX; occ++) {
@@ -113,6 +135,8 @@ void init_nr_signal(PHY_VARS_NR_UE *ue, PHY_VARS_gNB *gNB, init_params_t *config
   dfts_autoinit();
   init_nr_prach_tables(N_ZC);
   init_nr_prach_tables_float(N_ZC);
+
+  nr_init_frame_parms_ue_sa(&config->frame_parms, config->frame_parms.numerology_index);
 
   ue->frame_parms = gNB->frame_parms = config->frame_parms;
   ue->prach_config = gNB->prach_config = config->prach_config;
@@ -145,10 +169,12 @@ void deinit_nr_signal(PHY_VARS_NR_UE *ue, PHY_VARS_gNB *gNB) {
     for (int aa = 0; aa < nb_rx; aa++) {
       free(ue->txdata[aa]); 
       free(gNB->rxdata_int[aa]);
+      free(gNB->rxdata_float[aa]);
     }
 
     free(ue->txdata);
     free(gNB->rxdata_int);
+    free(gNB->rxdata_float);
 
     for (int occ = 0; occ < NUMBER_OF_NR_PRACH_OCCASIONS_MAX; occ++) {
       for (int aa = 0; aa < nb_rx; aa++) {
@@ -180,17 +206,17 @@ void noise_randn(void *input, void *output, int start, int end, int size, float 
         int nb_rx = 1;
 
         float re, im;
-        double power_tot = 0.0;
-        double power_avg = 0.0;
-        for(int n=start; n<end; n++) {
-          re = ((double)(((short *)input))[2*n]);
-          im = ((double)(((short *)input))[2*n+1]);
-          power_tot += re*re + im*im;
-        }
+        // double power_tot = 0.0;
+        // double power_avg = 0.0;
+        // for(int n=start; n<end; n++) {
+        //   re = ((double)(((short *)input))[2*n]);
+        //   im = ((double)(((short *)input))[2*n+1]);
+        //   power_tot += re*re + im*im;
+        // }
         
-        power_avg = power_tot / (end-start) / nb_rx;
+        // power_avg = power_tot / (end-start) / nb_rx;
 
-        float scalingFactor = 1.0/sqrtf((2.0*nb_rx*2048*powf(10.0, SNR_dB / 10.0)))*2*power_avg; // *32767? *2*power_avg? for int
+        float scalingFactor = 1.0/sqrtf((2.0*nb_rx*2048*powf(10.0, SNR_dB / 10.0)))*32767;
 
         // printf("%f\n", scalingFactor);
 
@@ -259,14 +285,16 @@ int main(int argc, char *argv[]) {
 
     init_params_t frame_and_prach_config = {
       .frame_parms = {
-        .ofdm_symbol_size = 2048,
+        .ofdm_symbol_size = 2048, // 1024, 2048
         .get_samples_slot_timestamp = &get_samples_slot_timestamp,
         .get_samples_per_slot = &get_samples_per_slot,
-        .samples_per_frame = 307200,
-        .samples_per_subframe = 30720,
-        .N_RB_UL = 106,
+        .samples_per_frame = 307200, // 1228800 307200
+        .samples_per_subframe = 30720, // 122880 30720
+        .N_RB_UL = 106, // 66, 106
+        .Ncp = 0, // 0 - normal, 1 - extended
         .nb_antennas_rx = 1,
-        .slots_per_subframe = 1,
+        .slots_per_subframe = 1, // 8, 1
+        .numerology_index = 0, // 0, 3
       },
       .prach_config = {
         .prach_sequence_length = 0, // 0 - Long sequence, 1 - Short sequence
@@ -288,21 +316,21 @@ int main(int argc, char *argv[]) {
         .indexFD_RA = 0,
         .numCs = 0,
         .numPRACH_Ocas = 1,
-        .prach_Format = 0,
+        .prach_Format = 0, // c0 = 9, fmt0 = 0; {"0","1","2","3", "A1","A2","A3","B1","B4","C0","C2","A1/B1","A2/B2","A3/B3"}
         .prach_StartSymbol = 0,
       },
     };
 
-    int Monte_Carlo = 1, 
+    int Monte_Carlo = 100, 
         freq_shift_start = 0,
-        freq_shift_step = 1, // 50 kHz
-        freq_shift_end = 0,//1200e3, // 1.2 MHz
+        freq_shift_step = 1, // 1 Hz
+        freq_shift_end = 0, // 1200e3, // 1.2 MHz
         delay_start = 0, // in samples
         delay_step = 1,
         delay_end = 0;
-    float SNR_start = 25.0, 
-          SNR_step = 1,
-          SNR_end = 25.0;
+    float SNR_start = -25.0, // -25
+          SNR_step = 1, // 0.5
+          SNR_end = 0.0; // 0
 
     if (SNR_step == 0 || delay_step == 0 || freq_shift_step == 0) {
       printf("Step can't be 0!\n");
@@ -324,7 +352,7 @@ int main(int argc, char *argv[]) {
 
     int size = ue.frame_parms.samples_per_frame;
 
-    int32_t second_ue_buf[1][size];
+    // int32_t second_ue_buf[1][size];
     // int32_t 
     // first 3 for loops (freq, snr, delay) can be in any order
     for (float SNR_dB = SNR_start; SNR_dB <= SNR_end; SNR_dB += SNR_step) {
@@ -380,7 +408,7 @@ int main(int argc, char *argv[]) {
               for (int aa = 0; aa < ue.frame_parms.nb_antennas_rx; aa++) {
                 time_delay_in_samples(&txdata_ue[aa][0], &rxdata_gNB[aa][0], size, delay);
                 freq_shift(&rxdata_gNB[aa][0], &rxdata_gNB[aa][0], size, freq_shift_Hz);
-                noise_randn(&rxdata_gNB[aa][0], &rxdata_gNB[aa][0], slot*30720, slot*30720+24576+3184, size, SNR_dB);
+                noise_randn(&rxdata_gNB[aa][0], &rxdata_gNB[aa][0], 0, ue.frame_parms.samples_per_frame, size, SNR_dB);
               }
 
 
@@ -390,18 +418,14 @@ int main(int argc, char *argv[]) {
 
               if (gNB_float) {
                 for (int aa = 0; aa < gNB.frame_parms.nb_antennas_rx; aa++) {
-                  for (int i = 30720*slot; i < 30720*slot+30720; i++) {
+                  for (int i = 0; i < size; i++) {
                     gNB.rxdata_float[aa][2*i] = (float)((int16_t *)&gNB.rxdata_int[0][0])[2*i] / 32767.0;
                     gNB.rxdata_float[aa][2*i+1] = (float)((int16_t *)&gNB.rxdata_int[0][0])[2*i + 1] / 32767.0;
                   }
                 }
               }
-            // LOG_M("rxdata0.m","rxdata",  &rxdata_gNB[0][0], 307200, 1, 1);
-
-              // LOG_M("rxdata0.m","rxdata",  &gNB.rxdata_float[0][0], 307200, 1, 13);
-
-        // LOG_M("rxdata0_int.m", "rxdata", &ue.txdata[0][0], 30720*2, 1, 1);
-        // LOG_M("rxdata0_float.m","rxdata", &gNB.rxdata_float[0][0], 30720*2, 1, 13);
+        // LOG_M("rxdata0.m", "rxdata", &ue.txdata[0][0], size/2, 1, 1);
+        // LOG_M("rxdata0_float.m","rxdata", &gNB.rxdata_float[0][0], size, 1, 13);
 
 
 #ifdef MAIN_DEBUG

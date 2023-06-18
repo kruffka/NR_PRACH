@@ -312,9 +312,10 @@ int32_t generate_nr_prach(PHY_VARS_NR_UE *ue, int slot, int ra_PreambleIndex, ui
 
   // now generate PRACH signal
 #ifdef NR_PRACH_DEBUG
+const char *prachfmt[]={"0","1","2","3", "A1","A2","A3","B1","B4","C0","C2","A1/B1","A2/B2","A3/B3"};
+
     if (NCS>0)
-      LOG_I(PHY, "PRACH generate PRACH in frame.slot %d.%d for RootSeqIndex %d, Preamble Index %d, PRACH Format %s, NCS %d (N_ZC %d): Preamble_offset %d, Preamble_shift %d msg1 frequency start %d\n",
-        frame,
+      LOG_I(PHY, "PRACH generate PRACH in slot %%d for RootSeqIndex %d, Preamble Index %d, PRACH Format %s, NCS %d (N_ZC %d): Preamble_offset %d, Preamble_shift %d msg1 frequency start %d\n",
         slot,
         rootSequenceIndex,
         preamble_index,
