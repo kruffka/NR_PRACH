@@ -285,20 +285,20 @@ int main(int argc, char *argv[]) {
 
     init_params_t frame_and_prach_config = {
       .frame_parms = {
-        .ofdm_symbol_size = 2048, // 1024, 2048
+        .ofdm_symbol_size = 1024, // 1024, 2048
         .get_samples_slot_timestamp = &get_samples_slot_timestamp,
         .get_samples_per_slot = &get_samples_per_slot,
-        .samples_per_frame = 307200, // 1228800 307200
-        .samples_per_subframe = 30720, // 122880 30720
-        .N_RB_UL = 106, // 66, 106
+        .samples_per_frame = 1228800, // 1228800 307200
+        .samples_per_subframe = 122880, // 122880 30720
+        .N_RB_UL = 66, // 66, 106
         .Ncp = 0, // 0 - normal, 1 - extended
         .nb_antennas_rx = 1,
-        .slots_per_subframe = 1, // 8, 1
-        .numerology_index = 0, // 0, 3
+        .slots_per_subframe = 8, // 8, 1
+        .numerology_index = 3, // 3, 2, 1, 0
       },
       .prach_config = {
-        .prach_sequence_length = 0, // 0 - Long sequence, 1 - Short sequence
-        .prach_sub_c_spacing = 0, // mu
+        .prach_sequence_length = 1, // 0 - Long sequence, 1 - Short sequence
+        .prach_sub_c_spacing = 3, // mu
         .restricted_set_config = 0,
         .num_prach_fd_occasions = 1,
         .num_prach_fd_occasions_list[0] = {
@@ -316,20 +316,20 @@ int main(int argc, char *argv[]) {
         .indexFD_RA = 0,
         .numCs = 0,
         .numPRACH_Ocas = 1,
-        .prach_Format = 0, // c0 = 9, fmt0 = 0; {"0","1","2","3", "A1","A2","A3","B1","B4","C0","C2","A1/B1","A2/B2","A3/B3"}
+        .prach_Format = 9, // c0 = 9, fmt0 = 0; {"0","1","2","3", "A1","A2","A3","B1","B4","C0","C2","A1/B1","A2/B2","A3/B3"}
         .prach_StartSymbol = 0,
       },
     };
 
     int Monte_Carlo = 100, 
         freq_shift_start = 0,
-        freq_shift_step = 1, // 1 Hz
-        freq_shift_end = 0, // 1200e3, // 1.2 MHz
+        freq_shift_step = 10e3, // 1 Hz
+        freq_shift_end = 250e3, // 1200e3, // 1.2 MHz
         delay_start = 0, // in samples
         delay_step = 1,
         delay_end = 0;
     float SNR_start = -25.0, // -25
-          SNR_step = 1, // 0.5
+          SNR_step = 5, // 0.5
           SNR_end = 0.0; // 0
 
     if (SNR_step == 0 || delay_step == 0 || freq_shift_step == 0) {
@@ -350,14 +350,14 @@ int main(int argc, char *argv[]) {
 
     printf("Running nof preamble idx %d\n", nof_preambles);
 
-    int size = ue.frame_parms.samples_per_frame;
+    int size = 30720;//ue.frame_parms.samples_per_frame;
 
     // int32_t second_ue_buf[1][size];
     // int32_t 
     // first 3 for loops (freq, snr, delay) can be in any order
     for (float SNR_dB = SNR_start; SNR_dB <= SNR_end; SNR_dB += SNR_step) {
       
-      // printf("detection_%ddb = [", (int)SNR_dB);
+      printf("detection_%ddb = [", (int)SNR_dB);
 
       for (int freq_shift_Hz = freq_shift_start; freq_shift_Hz <= freq_shift_end; freq_shift_Hz += freq_shift_step) {
 
@@ -447,15 +447,16 @@ int main(int argc, char *argv[]) {
             } else {
               // printf("FAIL!!!\n");
             }
+
           }
-          printf("delay %d samples; SNR = %lf dB; ffo = %d Hz; %d/%d\n", delay, SNR_dB, freq_shift_Hz, success, Monte_Carlo);
+          // printf("delay %d samples; SNR = %lf dB; ffo = %d Hz; %d/%d\n", delay, SNR_dB, freq_shift_Hz, success, Monte_Carlo);
           
-          // printf("%.2f, ", (float)success/Monte_Carlo);
+          printf("%.2f, ", (float)success/Monte_Carlo);
 
         }
 
       }
-      // printf("]\n");
+      printf("]\n");
 
     }
     printf("Results: %d/%d\n", success, (Monte_Carlo*(int)((SNR_end-SNR_start)/SNR_step)*(delay_end-delay_start)*(freq_shift_end-freq_shift_start))/delay_step/freq_shift_step);
